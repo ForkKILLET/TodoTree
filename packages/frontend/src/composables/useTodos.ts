@@ -1,0 +1,467 @@
+import { ref, computed } from 'vue'
+import { db } from '../services/db'
+import type {
+  Todo,
+  TodoTreeNode,
+  TodoStatus,
+  StatusDistribution,
+  ViewMode,
+  FilterOptions,
+  SortOptions
+} from '../types/todo'
+
+export function useTodos() {
+  const STORAGE_KEYS = {
+    expandedIds: 'todotree.expandedIds',
+    viewMode: 'todotree.viewMode',
+    filterOptions: 'todotree.filterOptions',
+    sortOptions: 'todotree.sortOptions'
+  } as const
+
+  const readStorage = <T>(key: string, fallback: T): T => {
+    if (typeof window === 'undefined') return fallback
+
+    try {
+      const raw = window.localStorage.getItem(key)
+      if (! raw) return fallback
+      return JSON.parse(raw) as T
+    }
+    catch {
+      return fallback
+    }
+  }
+
+  const writeStorage = (key: string, value: unknown) => {
+    if (typeof window === 'undefined') return
+
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value))
+    }
+    catch {
+      // ignore storage errors
+    }
+  }
+
+  const initialExpandedIds = readStorage<string[]>(STORAGE_KEYS.expandedIds, [])
+  const storedViewMode = readStorage<string>(STORAGE_KEYS.viewMode, 'tree')
+  const initialViewMode: ViewMode = storedViewMode === 'flat' ? 'flat' : 'tree'
+  const initialFilterOptions = readStorage<FilterOptions>(STORAGE_KEYS.filterOptions, {})
+  const initialSortOptions = readStorage<SortOptions>(STORAGE_KEYS.sortOptions, { field: 'order', direction: 'asc' })
+
+  const todos = ref<Todo[]>([])
+  const viewMode = ref<ViewMode>(initialViewMode)
+  const filterOptions = ref<FilterOptions>(initialFilterOptions)
+  const sortOptions = ref<SortOptions>(initialSortOptions)
+  const loading = ref(false)
+  const expandedIds = ref<Set<string>>(new Set(initialExpandedIds))
+
+  const loadTodos = async () => {
+    loading.value = true
+    try {
+      todos.value = await db.getAllTodos()
+    }
+    catch (error) {
+      console.error('Failed to load todos:', error)
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
+  const generateId = () => {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  }
+
+  const createTodo = async (content = '', parentId: string | null = null) => {
+    const now = Date.now()
+    const newTodo: Todo = {
+      id: generateId(),
+      content,
+      status: 'todo',
+      parentId,
+      children: [],
+      createdAt: now,
+      updatedAt: now,
+      order: now
+    }
+
+    try {
+      await db.addTodo(newTodo)
+
+      if (parentId) {
+        const parentIndex = todos.value.findIndex(todo => todo.id === parentId)
+
+        if (parentIndex !== - 1) {
+          const parent = todos.value[parentIndex]
+          const updatedChildren = [...parent.children, newTodo.id]
+          const updatedAt = Date.now()
+
+          await db.updateTodo(parentId, { children: updatedChildren })
+          todos.value[parentIndex] = {
+            ...parent,
+            children: updatedChildren,
+            updatedAt
+          }
+        }
+        else {
+          const parent = await db.getTodoById(parentId)
+          if (parent) {
+            await db.updateTodo(parentId, {
+              children: [...parent.children, newTodo.id]
+            })
+          }
+        }
+      }
+
+      todos.value.push(newTodo)
+      return newTodo.id
+    }
+    catch (error) {
+      console.error('Failed to create todo:', error)
+      await loadTodos()
+      throw error
+    }
+  }
+
+  const updateTodo = async (id: string, changes: Partial<Todo>) => {
+    try {
+      await db.updateTodo(id, changes)
+
+      const index = todos.value.findIndex(todo => todo.id === id)
+      if (index !== - 1) {
+        const current = todos.value[index]
+        todos.value[index] = {
+          ...current,
+          ...changes,
+          updatedAt: Date.now()
+        }
+      }
+    }
+    catch (error) {
+      console.error('Failed to update todo:', error)
+      await loadTodos()
+      throw error
+    }
+  }
+
+  const deleteTodo = async (id: string) => {
+    const todoMap = new Map<string, Todo>()
+    todos.value.forEach(todo => todoMap.set(todo.id, todo))
+
+    const collectDescendantIds = (todoId: string): string[] => {
+      const todo = todoMap.get(todoId)
+      if (! todo) return [todoId]
+
+      const ids = [todoId]
+      for (const childId of todo.children) {
+        ids.push(...collectDescendantIds(childId))
+      }
+      return ids
+    }
+
+    try {
+      await db.deleteTodo(id)
+
+      const deletedIds = new Set(collectDescendantIds(id))
+      const updatedAt = Date.now()
+
+      todos.value = todos.value
+        .filter(todo => ! deletedIds.has(todo.id))
+        .map(todo => {
+          const hasDeletedChild = todo.children.some(childId => deletedIds.has(childId))
+          if (! hasDeletedChild) {
+            return todo
+          }
+
+          return {
+            ...todo,
+            children: todo.children.filter(childId => ! deletedIds.has(childId)),
+            updatedAt
+          }
+        })
+    }
+    catch (error) {
+      console.error('Failed to delete todo:', error)
+      await loadTodos()
+      throw error
+    }
+  }
+
+  const getLeafNodes = (node: TodoTreeNode, todoMap: Map<string, Todo>): Todo[] => {
+    if (node.children.length === 0) {
+      return [node]
+    }
+
+    const leaves: Todo[] = []
+    for (const childId of node.children) {
+      const child = todoMap.get(childId)
+      if (child) {
+        const childNode: TodoTreeNode = { ...child, level: node.level + 1 }
+        leaves.push(...getLeafNodes(childNode, todoMap))
+      }
+    }
+    return leaves
+  }
+
+  const createEmptyDistribution = (): StatusDistribution => ({
+    todo: 0,
+    doing: 0,
+    done: 0,
+    cancelled: 0
+  })
+
+  const computeStatus = (todo: Todo, todoMap: Map<string, Todo>): { status: TodoStatus, leafStatusDistribution: StatusDistribution } => {
+    if (todo.children.length === 0) {
+      const distribution = createEmptyDistribution()
+      distribution[todo.status] = 1
+      return { status: todo.status, leafStatusDistribution: distribution }
+    }
+
+    // 获取所有叶子节点
+    const node: TodoTreeNode = { ...todo, level: 0 }
+    const leafNodes = getLeafNodes(node, todoMap)
+
+    // 计算叶子状态分布
+    const leafStatusDistribution = createEmptyDistribution()
+    leafNodes.forEach(leaf => {
+      leafStatusDistribution[leaf.status] += 1
+    })
+
+    // 计算状态
+    const childStatuses = todo.children.map(childId => {
+      const child = todoMap.get(childId)
+      if (! child) return 'todo'
+      return computeStatus(child, todoMap).status
+    })
+
+    let status: TodoStatus
+    if (childStatuses.every(s => s === 'cancelled')) {
+      status = 'cancelled'
+    }
+    else if (childStatuses.every(s => s === 'done')) {
+      status = 'done'
+    }
+    else if (childStatuses.every(s => s === 'todo')) {
+      status = 'todo'
+    }
+    else {
+      status = 'doing'
+    }
+
+    return { status, leafStatusDistribution }
+  }
+
+  // 构建树形结构
+  const buildTree = (items: Todo[]): TodoTreeNode[] => {
+    const todoMap = new Map<string, Todo>()
+    items.forEach(todo => todoMap.set(todo.id, todo))
+
+    const rootNodes: TodoTreeNode[] = []
+
+    items.forEach(todo => {
+      if (todo.parentId === null) {
+        const { status, leafStatusDistribution } = computeStatus(todo, todoMap)
+        const node: TodoTreeNode = {
+          ...todo,
+          level: 0,
+          isExpanded: expandedIds.value.has(todo.id),
+          computedStatus: status,
+          leafStatusDistribution
+        }
+        rootNodes.push(node)
+      }
+    })
+
+    // 递归构建子节点
+    const buildChildren = (node: TodoTreeNode): TodoTreeNode => {
+      if (node.children.length === 0) {
+        return node
+      }
+
+      node.childNodes = node.children
+        .map(childId => {
+          const child = todoMap.get(childId)
+          if (! child) return null
+
+          const { status, leafStatusDistribution } = computeStatus(child, todoMap)
+          const childNode: TodoTreeNode = {
+            ...child,
+            level: node.level + 1,
+            isExpanded: expandedIds.value.has(child.id),
+            computedStatus: status,
+            leafStatusDistribution
+          }
+          return buildChildren(childNode)
+        })
+        .filter((n): n is TodoTreeNode => n !== null)
+
+      return node
+    }
+
+    return rootNodes.map(buildChildren)
+  }
+
+  // 扁平化树
+  const flattenTree = (nodes: TodoTreeNode[]): TodoTreeNode[] => {
+    const result: TodoTreeNode[] = []
+
+    const flatten = (node: TodoTreeNode) => {
+      result.push(node)
+      if (node.isExpanded && node.childNodes) {
+        node.childNodes.forEach(flatten)
+      }
+    }
+
+    nodes.forEach(flatten)
+    return result
+  }
+
+  // 获取所有节点（扁平视图用）
+  const getAllNodes = (items: Todo[]): TodoTreeNode[] => {
+    const todoMap = new Map<string, Todo>()
+    items.forEach(todo => todoMap.set(todo.id, todo))
+
+    return items.map(todo => {
+      const { status, leafStatusDistribution } = computeStatus(todo, todoMap)
+      return {
+        ...todo,
+        level: 0,
+        computedStatus: status,
+        leafStatusDistribution
+      }
+    })
+  }
+
+  // 过滤
+  const applyFilter = (items: TodoTreeNode[]): TodoTreeNode[] => {
+    let filtered = items
+
+    if (filterOptions.value.status && filterOptions.value.status.length > 0) {
+      filtered = filtered.filter(item =>
+        filterOptions.value.status!.includes(item.computedStatus || item.status)
+      )
+    }
+
+    if (filterOptions.value.searchText) {
+      const searchLower = filterOptions.value.searchText.toLowerCase()
+      filtered = filtered.filter(item =>
+        item.content.toLowerCase().includes(searchLower)
+      )
+    }
+
+    return filtered
+  }
+
+  // 排序比较器
+  const compareBySortOptions = (a: TodoTreeNode, b: TodoTreeNode) => {
+    const { field, direction } = sortOptions.value
+
+    let aVal: any
+    let bVal: any
+
+    if (field === 'status') {
+      aVal = a.computedStatus || a.status
+      bVal = b.computedStatus || b.status
+    }
+    else {
+      aVal = a[field]
+      bVal = b[field]
+    }
+
+    if (aVal < bVal) return direction === 'asc' ? - 1 : 1
+    if (aVal > bVal) return direction === 'asc' ? 1 : - 1
+    return 0
+  }
+
+  // 平铺列表排序（仅用于平铺视图）
+  const applySort = (items: TodoTreeNode[]): TodoTreeNode[] => {
+    const sorted = [...items]
+    sorted.sort(compareBySortOptions)
+    return sorted
+  }
+
+  // 树内同级排序（父子层级不打散）
+  const sortTreeNodes = (nodes: TodoTreeNode[]): TodoTreeNode[] => {
+    const sorted = [...nodes].sort(compareBySortOptions)
+
+    return sorted.map(node => {
+      if (! node.childNodes || node.childNodes.length === 0) {
+        return node
+      }
+
+      return {
+        ...node,
+        childNodes: sortTreeNodes(node.childNodes)
+      }
+    })
+  }
+
+  // 计算显示的todos
+  const displayTodos = computed(() => {
+    if (todos.value.length === 0) return []
+
+    let nodes: TodoTreeNode[]
+
+    if (viewMode.value === 'tree') {
+      const tree = buildTree(todos.value)
+      const sortedTree = sortTreeNodes(tree)
+      nodes = flattenTree(sortedTree)
+      nodes = applyFilter(nodes)
+      return nodes
+    }
+
+    nodes = getAllNodes(todos.value)
+    nodes = applyFilter(nodes)
+    nodes = applySort(nodes)
+
+    return nodes
+  })
+
+  // 切换展开状态
+  const toggleExpand = (id: string) => {
+    if (expandedIds.value.has(id)) {
+      expandedIds.value.delete(id)
+    }
+    else {
+      expandedIds.value.add(id)
+    }
+    expandedIds.value = new Set(expandedIds.value)
+    writeStorage(STORAGE_KEYS.expandedIds, [...expandedIds.value])
+  }
+
+  // 切换视图模式
+  const setViewMode = (mode: ViewMode) => {
+    viewMode.value = mode
+    writeStorage(STORAGE_KEYS.viewMode, mode)
+  }
+
+  // 设置过滤选项
+  const setFilterOptions = (options: FilterOptions) => {
+    filterOptions.value = options
+    writeStorage(STORAGE_KEYS.filterOptions, options)
+  }
+
+  // 设置排序选项
+  const setSortOptions = (options: SortOptions) => {
+    sortOptions.value = options
+    writeStorage(STORAGE_KEYS.sortOptions, options)
+  }
+
+  return {
+    todos,
+    displayTodos,
+    viewMode,
+    filterOptions,
+    sortOptions,
+    loading,
+    expandedIds,
+    loadTodos,
+    createTodo,
+    updateTodo,
+    deleteTodo,
+    toggleExpand,
+    setViewMode,
+    setFilterOptions,
+    setSortOptions
+  }
+}

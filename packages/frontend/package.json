@@ -1,0 +1,33 @@
+{
+  "name": "frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "rsbuild build",
+    "dev": "rsbuild dev --open",
+    "preview": "rsbuild preview",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "dexie": "^4.3.0",
+    "lucide-vue-next": "^0.577.0",
+    "marked": "^17.0.4",
+    "turndown": "^7.2.2",
+    "vue": "^3.5.26"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@rsbuild/core": "^1.7.1",
+    "@rsbuild/plugin-vue": "^1.2.2",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/turndown": "^5.0.6",
+    "eslint": "^10.0.3",
+    "eslint-plugin-vue": "^10.8.0",
+    "globals": "^17.4.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1",
+    "vue-eslint-parser": "^10.4.0"
+  }
+}
