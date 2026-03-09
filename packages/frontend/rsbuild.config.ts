@@ -5,5 +5,8 @@ export default defineConfig({
   plugins: [pluginVue()],
   html: {
     title: 'TodoTree',
+  },
+  output: {
+    assetPrefix: './',
   }
 })
