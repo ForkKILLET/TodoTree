@@ -8,12 +8,13 @@
       :level="isTree ? todo.level : 0"
       :should-auto-edit="editingTodoId === todo.id"
       @toggle-expand="(id) => $emit('toggle-expand', id)"
+      @expand-to-matched-descendants="(id) => $emit('expand-to-matched-descendants', id)"
       @update="(id, changes) => $emit('update', id, changes)"
       @delete="(id) => $emit('delete', id)"
       @add-child="(parentId) => $emit('add-child', parentId)"
     />
     <div v-if="todos.length === 0" class="empty-state">
-      暂无 TODO 项
+      暂无 Todo 项
     </div>
   </div>
 </template>
@@ -35,6 +36,7 @@ withDefaults(defineProps<Props>(), {
 
 defineEmits<{
   (e: 'toggle-expand', id: string): void
+  (e: 'expand-to-matched-descendants', id: string): void
   (e: 'update', id: string, changes: Partial<TodoTreeNode>): void
   (e: 'delete', id: string): void
   (e: 'add-child', parentId: string): void

@@ -1,6 +1,8 @@
 <template>
   <div :class="['t-button-group', size]">
-    <slot ghost :size="size" />
+    <div class="t-button-group-wrapper">
+      <slot />
+    </div>
   </div>
 </template>
 
@@ -15,13 +17,13 @@ withDefaults(defineProps<Props>(), {
 </script>
 
 <style scoped>
-.t-button-group {
+.t-button-group-wrapper {
   display: inline-flex;
   align-items: center;
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-lg);
-  overflow: hidden;
   background-color: var(--color-bg-primary);
+  overflow: hidden;
 }
 
 .t-button-group :deep(.t-button) {

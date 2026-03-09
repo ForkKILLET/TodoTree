@@ -3,8 +3,8 @@
     <Toolbar
       :view-mode="viewMode"
       :filter-statuses="filterOptions.status || []"
-      :sort-field="sortOptions.field"
-      :sort-direction="sortOptions.direction"
+      :filter-search-text="filterOptions.searchText || ''"
+      :sort-steps="sortOptions"
       @update:view-mode="setViewMode"
       @update:filter="handleFilterUpdate"
       @update:sort="handleSortUpdate"
@@ -19,6 +19,7 @@
       :is-tree="viewMode === 'tree'"
       :editing-todo-id="editingTodoId"
       @toggle-expand="toggleExpand"
+      @expand-to-matched-descendants="expandToMatchedDescendants"
       @update="handleUpdate"
       @delete="deleteTodo"
       @add-child="handleAddChild"
@@ -31,7 +32,7 @@ import { onMounted, ref } from 'vue'
 import Toolbar from './components/Toolbar.vue'
 import TodoList from './components/TodoList.vue'
 import { useTodos } from './composables/useTodos'
-import type { TodoStatus, SortField, SortDirection, TodoTreeNode } from './types/todo'
+import type { TodoStatus, SortOptions, TodoTreeNode } from './types/todo'
 
 const {
   displayTodos,
@@ -45,6 +46,7 @@ const {
   updateTodo,
   deleteTodo,
   toggleExpand,
+  expandToMatchedDescendants,
   setViewMode,
   setFilterOptions,
   setSortOptions
@@ -66,8 +68,8 @@ const handleFilterUpdate = (statuses: TodoStatus[], searchText: string) => {
   setFilterOptions({ status: statuses.length > 0 ? statuses : undefined, searchText: searchText || undefined })
 }
 
-const handleSortUpdate = (field: SortField, direction: SortDirection) => {
-  setSortOptions({ field, direction })
+const handleSortUpdate = (sortSteps: SortOptions) => {
+  setSortOptions(sortSteps)
 }
 
 const handleAddRoot = async () => {

@@ -19,6 +19,8 @@ export interface TodoTreeNode extends Todo {
   isExpanded?: boolean
   computedStatus?: TodoStatus
   leafStatusDistribution?: StatusDistribution
+  isFilterMatch?: boolean
+  hasCollapsedMatchedDescendant?: boolean
 }
 
 export type ViewMode = 'tree' | 'flat'
@@ -31,7 +33,9 @@ export interface FilterOptions {
   searchText?: string
 }
 
-export interface SortOptions {
+export interface SortStep {
   field: SortField
   direction: SortDirection
 }
+
+export type SortOptions = SortStep[]

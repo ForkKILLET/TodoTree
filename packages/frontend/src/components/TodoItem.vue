@@ -1,5 +1,5 @@
 <template>
-  <div class="todo-item" :style="{ '--indent-offset': `${level * 30}px` }">
+  <div class="todo-item" :class="{ 'filter-match': todo.isFilterMatch }" :style="{ '--indent-offset': `${level * 30}px` }">
     <TButtonGroup class="todo-item-actions" size="sm" :class="{ 'is-visible': isEditing }">
       <TButton
         v-for="button in currentActionButtons"
@@ -16,12 +16,13 @@
     <div class="todo-item-wrapper">
       <TButton
         v-if="isTree && todo.children.length > 0"
-        class="expand-btn"
+        :class="['expand-btn', { 'expand-to-match': todo.hasCollapsedMatchedDescendant }]"
         size="sm"
         theme="ghost"
         square
-        :icon="todo.isExpanded ? ChevronDown : ChevronRight"
-        @click="$emit('toggle-expand', todo.id)"
+        :icon="todo.hasCollapsedMatchedDescendant ? ChevronsRight : (todo.isExpanded ? ChevronDown : ChevronRight)"
+        :tooltip="todo.hasCollapsedMatchedDescendant ? '展开到匹配子项' : (todo.isExpanded ? '收起' : '展开')"
+        @click="handleExpandClick"
       />
       <div v-else-if="isTree" class="expand-placeholder"></div>
 
@@ -92,7 +93,7 @@
   <ConfirmDialog
     v-model="showDeleteDialog"
     title="删除确认"
-    message="确定要删除这个 TODO 项吗？此操作将同时删除所有子项且无法撤销。"
+    message="确定要删除这个 Todo 项吗？此操作将同时删除所有子项且无法撤销。"
     confirm-text="删除"
     cancel-text="取消"
     @confirm="handleDeleteConfirm"
@@ -103,7 +104,7 @@
 import { computed, ref, nextTick, watch, useTemplateRef } from 'vue'
 import { marked } from 'marked'
 import TurndownService from 'turndown'
-import { ChevronRight, ChevronDown, Pencil, Plus, Trash2, FileCode2, NotebookPen, Check } from 'lucide-vue-next'
+import { ChevronRight, ChevronDown, ChevronsRight, Pencil, Plus, Trash2, FileCode2, NotebookPen, Check } from 'lucide-vue-next'
 import type { Component } from 'vue'
 import StatusDot from './StatusDot.vue'
 import TButton from './TButton.vue'
@@ -126,6 +127,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   (e: 'toggle-expand', id: string): void
+  (e: 'expand-to-matched-descendants', id: string): void
   (e: 'update', id: string, changes: Partial<TodoTreeNode>): void
   (e: 'delete', id: string): void
   (e: 'add-child', parentId: string): void
@@ -259,6 +261,14 @@ const addChild = () => {
   emit('add-child', props.todo.id)
 }
 
+const handleExpandClick = () => {
+  if (props.todo.hasCollapsedMatchedDescendant) {
+    emit('expand-to-matched-descendants', props.todo.id)
+    return
+  }
+  emit('toggle-expand', props.todo.id)
+}
+
 const remove = () => {
   showDeleteDialog.value = true
 }
@@ -345,6 +355,10 @@ watch(
   transition: var(--transition-fast);
 }
 
+.todo-item.filter-match .todo-item-content {
+  border: 1px solid var(--color-success);
+}
+
 .todo-item-content:hover,
 .todo-item-content:focus-within {
   border-color: var(--color-primary);
@@ -352,6 +366,10 @@ watch(
 
 .expand-btn {
   flex-shrink: 0;
+}
+
+.expand-btn.expand-to-match {
+  color: var(--color-success);
 }
 
 .expand-placeholder {

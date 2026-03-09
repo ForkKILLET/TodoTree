@@ -62,14 +62,12 @@ body {
 }
 
 .tooltip {
-  position: absolute;
-  bottom: calc(100% + 4px);
-  left: 50%;
+  position: fixed;
   transform: translateX(-50%);
   background: var(--color-bg-primary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: 4px 8px;
+  padding: 3px 6px;
   font-size: 12px;
   white-space: nowrap;
   pointer-events: none;

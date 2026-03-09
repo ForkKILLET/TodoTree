@@ -46,7 +46,7 @@ export function useTodos() {
   const storedViewMode = readStorage<string>(STORAGE_KEYS.viewMode, 'tree')
   const initialViewMode: ViewMode = storedViewMode === 'flat' ? 'flat' : 'tree'
   const initialFilterOptions = readStorage<FilterOptions>(STORAGE_KEYS.filterOptions, {})
-  const initialSortOptions = readStorage<SortOptions>(STORAGE_KEYS.sortOptions, { field: 'order', direction: 'asc' })
+  const initialSortOptions = readStorage<SortOptions>(STORAGE_KEYS.sortOptions, [{ field: 'order', direction: 'asc' }])
 
   const todos = ref<Todo[]>([])
   const viewMode = ref<ViewMode>(initialViewMode)
@@ -332,7 +332,85 @@ export function useTodos() {
     })
   }
 
-  // 过滤
+  // 检查节点是否匹配筛选条件
+  const nodeMatchesFilter = (node: TodoTreeNode): boolean => {
+    if (filterOptions.value.status && filterOptions.value.status.length > 0) {
+      if (! filterOptions.value.status.includes(node.computedStatus || node.status)) {
+        return false
+      }
+    }
+
+    if (filterOptions.value.searchText) {
+      const searchLower = filterOptions.value.searchText.toLowerCase()
+      if (! node.content.toLowerCase().includes(searchLower)) {
+        return false
+      }
+    }
+
+    return true
+  }
+
+  // 树形筛选：保留匹配节点及其所有祖先，并标记匹配节点/未展开命中后代
+  const filterTreeNodes = (nodes: TodoTreeNode[], matchedIds: Set<string>): TodoTreeNode[] => {
+    const hasSearchText = Boolean(filterOptions.value.searchText?.trim())
+
+    const walk = (node: TodoTreeNode): { kept: TodoTreeNode | null, hasMatchInSubtree: boolean, hasCollapsedMatchInSubtree: boolean } => {
+      const childResults = (node.childNodes || []).map(walk)
+      const keptChildren = childResults
+        .map(result => result.kept)
+        .filter((child): child is TodoTreeNode => child !== null)
+
+      const isMatch = nodeMatchesFilter(node)
+      if (isMatch) {
+        matchedIds.add(node.id)
+      }
+
+      const hasMatchInSubtree = isMatch || childResults.some(result => result.hasMatchInSubtree)
+      if (! hasMatchInSubtree) {
+        return { kept: null, hasMatchInSubtree: false, hasCollapsedMatchInSubtree: false }
+      }
+
+      const hasCollapsedBySelf = hasSearchText && ! node.isExpanded && keptChildren.length > 0
+      const hasCollapsedByDescendant = hasSearchText && childResults.some(result => result.hasCollapsedMatchInSubtree)
+      const hasCollapsedMatchInSubtree = hasCollapsedBySelf || hasCollapsedByDescendant
+
+      return {
+        kept: {
+          ...node,
+          childNodes: keptChildren,
+          isFilterMatch: hasSearchText && isMatch,
+          hasCollapsedMatchedDescendant: hasCollapsedMatchInSubtree
+        },
+        hasMatchInSubtree,
+        hasCollapsedMatchInSubtree
+      }
+    }
+
+    return nodes
+      .map(walk)
+      .map(result => result.kept)
+      .filter((node): node is TodoTreeNode => node !== null)
+  }
+
+  const findNodeInTree = (nodes: TodoTreeNode[], id: string): TodoTreeNode | null => {
+    for (const node of nodes) {
+      if (node.id === id) return node
+      if (! node.childNodes?.length) continue
+      const found = findNodeInTree(node.childNodes, id)
+      if (found) return found
+    }
+    return null
+  }
+
+  const collectExpandableIds = (node: TodoTreeNode, ids: Set<string>) => {
+    if (! node.childNodes?.length) {
+      return
+    }
+    ids.add(node.id)
+    node.childNodes.forEach(child => collectExpandableIds(child, ids))
+  }
+
+  // 扁平列表过滤（仅用于扁平视图）
   const applyFilter = (items: TodoTreeNode[]): TodoTreeNode[] => {
     let filtered = items
 
@@ -352,24 +430,25 @@ export function useTodos() {
     return filtered
   }
 
-  // 排序比较器
+  // 排序比较器（级联多步骤排序）
   const compareBySortOptions = (a: TodoTreeNode, b: TodoTreeNode) => {
-    const { field, direction } = sortOptions.value
+    const steps = sortOptions.value
+    for (const { field, direction } of steps) {
+      let aVal: any
+      let bVal: any
 
-    let aVal: any
-    let bVal: any
+      if (field === 'status') {
+        aVal = a.computedStatus || a.status
+        bVal = b.computedStatus || b.status
+      }
+      else {
+        aVal = a[field]
+        bVal = b[field]
+      }
 
-    if (field === 'status') {
-      aVal = a.computedStatus || a.status
-      bVal = b.computedStatus || b.status
+      if (aVal < bVal) return direction === 'asc' ? - 1 : 1
+      if (aVal > bVal) return direction === 'asc' ? 1 : - 1
     }
-    else {
-      aVal = a[field]
-      bVal = b[field]
-    }
-
-    if (aVal < bVal) return direction === 'asc' ? - 1 : 1
-    if (aVal > bVal) return direction === 'asc' ? 1 : - 1
     return 0
   }
 
@@ -398,15 +477,20 @@ export function useTodos() {
 
   // 计算显示的todos
   const displayTodos = computed(() => {
-    if (todos.value.length === 0) return []
+    if (! todos.value.length) return []
 
     let nodes: TodoTreeNode[]
 
     if (viewMode.value === 'tree') {
       const tree = buildTree(todos.value)
       const sortedTree = sortTreeNodes(tree)
-      nodes = flattenTree(sortedTree)
-      nodes = applyFilter(nodes)
+      
+      // 在树上应用筛选（保留匹配节点及其祖先）
+      const matchedIds = new Set<string>()
+      const filteredTree = filterTreeNodes(sortedTree, matchedIds)
+
+      // 最后扁平化展示
+      nodes = flattenTree(filteredTree)
       return nodes
     }
 
@@ -429,6 +513,25 @@ export function useTodos() {
     writeStorage(STORAGE_KEYS.expandedIds, [...expandedIds.value])
   }
 
+  const expandToMatchedDescendants = (id: string) => {
+    if (viewMode.value !== 'tree') return
+    if (! filterOptions.value.searchText?.trim()) return
+
+    const tree = buildTree(todos.value)
+    const sortedTree = sortTreeNodes(tree)
+    const matchedIds = new Set<string>()
+    const filteredTree = filterTreeNodes(sortedTree, matchedIds)
+    const targetNode = findNodeInTree(filteredTree, id)
+    if (! targetNode) return
+
+    const idsToExpand = new Set<string>()
+    collectExpandableIds(targetNode, idsToExpand)
+    idsToExpand.forEach(nodeId => expandedIds.value.add(nodeId))
+
+    expandedIds.value = new Set(expandedIds.value)
+    writeStorage(STORAGE_KEYS.expandedIds, [...expandedIds.value])
+  }
+
   // 切换视图模式
   const setViewMode = (mode: ViewMode) => {
     viewMode.value = mode
@@ -443,8 +546,8 @@ export function useTodos() {
 
   // 设置排序选项
   const setSortOptions = (options: SortOptions) => {
-    sortOptions.value = options
-    writeStorage(STORAGE_KEYS.sortOptions, options)
+    sortOptions.value = options.length > 0 ? options : [{ field: 'order', direction: 'asc' }]
+    writeStorage(STORAGE_KEYS.sortOptions, sortOptions.value)
   }
 
   return {
@@ -460,6 +563,7 @@ export function useTodos() {
     updateTodo,
     deleteTodo,
     toggleExpand,
+    expandToMatchedDescendants,
     setViewMode,
     setFilterOptions,
     setSortOptions
