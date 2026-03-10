@@ -1,6 +1,6 @@
 <template>
   <div class="toolbar">
-    <div class="toolbar-section">
+    <div class="toolbar-section toolbar-main-row">
       <TButtonGroup size="sm">
         <TButton
           v-for="{ value, label, icon } in viewModes"
@@ -80,9 +80,27 @@
         tooltip="添加根项"
         @click="$emit('add-root')"
       />
+
+      <div class="toolbar-right-actions">
+        <TButton
+          size="sm"
+          square
+          :icon="Settings"
+          tooltip="设置"
+          @click="handleSettingsPlaceholder"
+        />
+        <TButton
+          size="sm"
+          square
+          tooltip="GitHub"
+          @click="openGithub"
+        >
+          <img class="simpleicon" src="https://cdn.simpleicons.org/github" alt="GitHub" />
+        </TButton>
+      </div>
     </div>
 
-    <div v-if="hasFilterStep || sortSteps.length > 0" class="steps-row">
+    <div v-if="hasFilterStep || sortSteps.length > 0" class="toolbar-section">
       <div v-if="hasFilterStep" class="menu-anchor">
         <button type="button" class="step-chip" @click="toggleMenuId('filter-step')">
           <Funnel :size="14" class="step-chip-icon" />
@@ -128,7 +146,7 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
-import { TreePine, List, Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, Type, CircleCheck, Clock, BadgeCheck } from 'lucide-vue-next'
+import { TreePine, List, Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, Type, CircleCheck, Clock, BadgeCheck, Settings } from 'lucide-vue-next'
 import StatusDot from './StatusDot.vue'
 import TButton from './TButton.vue'
 import TButtonGroup from './TButtonGroup.vue'
@@ -260,6 +278,13 @@ const updateSort = () => {
   emit('update:sort', sortSteps.value)
 }
 
+const handleSettingsPlaceholder = () => {
+}
+
+const openGithub = () => {
+  window.open('https://github.com/ForkKILLET/TodoTree', '_blank', 'noopener,noreferrer')
+}
+
 const handleOutsideClick = (event: MouseEvent) => {
   if (! openMenuId.value) return
   const target = event.target as HTMLElement | null
@@ -295,6 +320,23 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.toolbar-main-row {
+  width: 100%;
+}
+
+.toolbar-right-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.simpleicon {
+  width: 14px;
+  height: 14px;
+  display: block;
 }
 
 .search-input {
@@ -354,12 +396,6 @@ onBeforeUnmount(() => {
 
 .menu-item.danger {
   color: var(--color-danger);
-}
-
-.steps-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .step-chip {
