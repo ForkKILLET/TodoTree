@@ -19,7 +19,7 @@
         size="sm"
         type="text"
         class="search-input"
-        placeholder="搜索..."
+        placeholder="搜索…"
         @update:modelValue="updateSearch"
       />
 

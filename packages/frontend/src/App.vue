@@ -33,11 +33,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, provide } from 'vue'
 import Toolbar from './components/Toolbar.vue'
 import TodoList from './components/TodoList.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import { useTodos } from './composables/useTodos'
+import { useSettings } from './composables/useSettings'
+import { settingsDataInjectionKey } from './injectionKeys/settings'
 import type { TodoStatus, SortOptions, TodoTreeNode } from './types/todo'
 
 const {
@@ -58,6 +60,9 @@ const {
   setFilterOptions,
   setSortOptions
 } = useTodos()
+
+const { settingsData } = useSettings()
+provide(settingsDataInjectionKey, settingsData)
 
 const editingTodoId = ref<string | null>(null)
 const showSettings = ref(false)

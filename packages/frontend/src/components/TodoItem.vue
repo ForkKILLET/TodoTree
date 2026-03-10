@@ -89,6 +89,7 @@
             class="markdown edit-contenteditable"
             contenteditable="true"
             @input="handleEditInput"
+            @blur="handleEditorBlur"
             @keydown.ctrl.enter.prevent="saveAndExitEdit"
           ></div>
           <textarea
@@ -96,6 +97,7 @@
             ref="markdownInput"
             v-model="editContent"
             class="edit-markdown"
+            @blur="handleEditorBlur"
             @keydown.ctrl.enter.prevent="saveAndExitEdit"
           />
         </template>
@@ -114,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick, watch, useTemplateRef, onMounted, onBeforeUnmount } from 'vue'
+import { computed, inject, ref, nextTick, watch, useTemplateRef, onMounted, onBeforeUnmount } from 'vue'
 import { marked } from 'marked'
 import TurndownService from 'turndown'
 import { ChevronRight, ChevronDown, ChevronsRight, Pencil, Plus, Trash2, FileCode2, NotebookPen, Check } from 'lucide-vue-next'
@@ -124,6 +126,7 @@ import TButton from './TButton.vue'
 import type { TodoTreeNode, TodoStatus } from '../types/todo'
 import TButtonGroup from './TButtonGroup.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
+import { settingsDataInjectionKey } from '../injectionKeys/settings'
 
 interface Props {
   todo: TodoTreeNode
@@ -175,6 +178,10 @@ interface ActionButton {
   onClick: () => void
   active?: boolean
 }
+
+const settingsData = inject(settingsDataInjectionKey, null)
+const defaultMarkdownMode = computed(() => settingsData?.value.defaultMarkdownMode ?? false)
+const autoSubmitOnBlur = computed(() => settingsData?.value.autoSubmitOnBlur ?? true)
 
 const currentStatus = computed(() => props.todo.computedStatus || props.todo.status)
 const isLeaf = computed(() => props.todo.children.length === 0)
@@ -230,12 +237,18 @@ const setStatus = (status: TodoStatus) => {
 const startEdit = () => {
   isEditing.value = true
   editContent.value = props.todo.content
-  editMode.value = 'wysiwyg'
+  editMode.value = defaultMarkdownMode.value ? 'markdown' : 'wysiwyg'
   nextTick(() => {
+    if (editMode.value === 'markdown') {
+      markdownInput.value?.focus()
+      const len = markdownInput.value?.value.length ?? 0
+      markdownInput.value?.setSelectionRange(len, len)
+      return
+    }
+
     if (! editInput.value) return
 
     editInput.value.innerHTML = renderedEditContent.value
-    
     editInput.value.focus()
   })
 }
@@ -255,6 +268,20 @@ const saveEdit = () => {
 const saveAndExitEdit = () => {
   saveEdit()
   isEditing.value = false
+}
+
+const handleEditorBlur = (event: FocusEvent) => {
+  if (! autoSubmitOnBlur.value || ! isEditing.value) return
+
+  const currentTarget = event.currentTarget as HTMLElement | null
+  const todoItem = currentTarget?.closest('.todo-item')
+  const nextTarget = event.relatedTarget as Node | null
+
+  if (todoItem && nextTarget && todoItem.contains(nextTarget)) {
+    return
+  }
+
+  saveAndExitEdit()
 }
 
 const toggleEditMode = () => {
@@ -410,7 +437,6 @@ const editingActionButtons = computed<ActionButton[]>(() => [
     icon: editMode.value === 'wysiwyg' ? FileCode2 : NotebookPen,
     tooltip: editMode.value === 'wysiwyg' ? '切换为 Markdown 源码模式' : '切换为所见即所得模式',
     onClick: toggleEditMode,
-    active: editMode.value === 'markdown'
   },
   { key: 'done-edit', icon: Check, tooltip: '完成编辑', onClick: saveAndExitEdit }
 ])
