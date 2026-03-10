@@ -8,12 +8,12 @@
       :level="isTree ? todo.level : 0"
       :should-auto-edit="editingTodoId === todo.id"
       :is-draggable="isDraggable"
-      @toggle-expand="(id) => $emit('toggle-expand', id)"
-      @expand-to-matched-descendants="(id) => $emit('expand-to-matched-descendants', id)"
-      @update="(id, changes) => $emit('update', id, changes)"
-      @delete="(id) => $emit('delete', id)"
-      @add-child="(parentId) => $emit('add-child', parentId)"
-      @reorder="(draggedId, targetId, insertBefore) => $emit('reorder', draggedId, targetId, insertBefore)"
+      @toggle-expand="(id) => emit('toggle-expand', id)"
+      @expand-to-matched-descendants="(id) => emit('expand-to-matched-descendants', id)"
+      @update="(id, changes) => emit('update', id, changes)"
+      @delete="(id) => emit('delete', id)"
+      @add-child="(parentId) => emit('add-child', parentId)"
+      @reorder="(draggedId, targetId, insertBefore) => emit('reorder', draggedId, targetId, insertBefore)"
     />
     <div v-if="todos.length === 0" class="empty-state">
       暂无 Todo 项

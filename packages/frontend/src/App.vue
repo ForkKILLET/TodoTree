@@ -9,9 +9,10 @@
       @update:filter="handleFilterUpdate"
       @update:sort="handleSortUpdate"
       @add-root="handleAddRoot"
+      @settings-open="showSettings = true"
     />
     
-    <div v-if="loading" class="loading">加载中...</div>
+    <div v-if="loading" class="loading">加载中…</div>
     
     <TodoList
       v-else
@@ -26,6 +27,8 @@
       @add-child="handleAddChild"
       @reorder="handleReorder"
     />
+
+    <SettingsPanel :is-open="showSettings" @close="showSettings = false" />
   </div>
 </template>
 
@@ -33,6 +36,7 @@
 import { onMounted, ref, computed } from 'vue'
 import Toolbar from './components/Toolbar.vue'
 import TodoList from './components/TodoList.vue'
+import SettingsPanel from './components/SettingsPanel.vue'
 import { useTodos } from './composables/useTodos'
 import type { TodoStatus, SortOptions, TodoTreeNode } from './types/todo'
 
@@ -56,6 +60,7 @@ const {
 } = useTodos()
 
 const editingTodoId = ref<string | null>(null)
+const showSettings = ref(false)
 
 const isDraggable = computed(() => sortOptions.value.length === 0 && viewMode.value === 'tree')
 

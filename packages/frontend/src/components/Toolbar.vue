@@ -8,7 +8,7 @@
           :icon="icon"
           :key="value"
           square
-          @click="$emit('update:viewMode', value)"
+          @click="emit('update:viewMode', value)"
           :tooltip="label"
         >
         </TButton>
@@ -39,13 +39,6 @@
           >
             <CircleCheck :size="14" />
             <span>状态</span>
-          </button>
-          <button
-            type="button"
-            class="menu-item"
-          >
-            <Type :size="14" />
-            <span>内容</span>
           </button>
         </div>
       </div>
@@ -78,7 +71,7 @@
         square
         :icon="Plus"
         tooltip="添加根项"
-        @click="$emit('add-root')"
+        @click="emit('add-root')"
       />
 
       <div class="toolbar-right-actions">
@@ -87,7 +80,7 @@
           square
           :icon="Settings"
           tooltip="设置"
-          @click="handleSettingsPlaceholder"
+          @click="openSettings"
         />
         <TButton
           size="sm"
@@ -146,7 +139,7 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
-import { TreePine, List, Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, Type, CircleCheck, Clock, BadgeCheck, Settings } from 'lucide-vue-next'
+import { TreePine, List, Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, CircleCheck, Clock, Settings } from 'lucide-vue-next'
 import StatusDot from './StatusDot.vue'
 import TButton from './TButton.vue'
 import TButtonGroup from './TButtonGroup.vue'
@@ -167,6 +160,7 @@ const emit = defineEmits<{
   'update:filter': [statuses: TodoStatus[], searchText: string]
   'update:sort': [steps: SortStep[]]
   'add-root': []
+  'settings-open': []
 }>()
 
 const searchText = ref(props.filterSearchText)
@@ -197,7 +191,7 @@ const statuses: Definition<TodoStatus>[] = [
 const sortFieldsWithIcons: DefinitionWithIcon<SortField>[] = [
   { value: 'createdAt', label: '创建时间', icon: Clock },
   { value: 'updatedAt', label: '更新时间', icon: Clock },
-  { value: 'status', label: '状态', icon: BadgeCheck }
+  { value: 'status', label: '状态', icon: CircleCheck }
 ]
 
 const getSortFieldLabel = (field: SortField) => {
@@ -278,7 +272,8 @@ const updateSort = () => {
   emit('update:sort', sortSteps.value)
 }
 
-const handleSettingsPlaceholder = () => {
+const openSettings = () => {
+  emit('settings-open')
 }
 
 const openGithub = () => {

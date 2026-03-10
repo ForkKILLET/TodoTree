@@ -1,6 +1,6 @@
 import type { Directive } from 'vue'
 
-const TOOLTIP_DELAY = 200
+const TOOLTIP_DELAY = 600
 
 declare global {
   interface HTMLElement {
