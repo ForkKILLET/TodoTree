@@ -85,10 +85,10 @@
         <TButton
           size="sm"
           square
+          :icon="Github"
           tooltip="GitHub"
           @click="openGithub"
         >
-          <img class="simpleicon" src="https://cdn.simpleicons.org/github" alt="GitHub" />
         </TButton>
       </div>
     </div>
@@ -139,7 +139,7 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
-import { TreePine, List, Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, CircleCheck, Clock, Settings } from 'lucide-vue-next'
+import { TreePine, List, Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, CircleCheck, Clock, Settings, Github } from 'lucide-vue-next'
 import StatusDot from './StatusDot.vue'
 import TButton from './TButton.vue'
 import TButtonGroup from './TButtonGroup.vue'
@@ -277,7 +277,7 @@ const openSettings = () => {
 }
 
 const openGithub = () => {
-  window.open('https://github.com/ForkKILLET/TodoTree', '_blank', 'noopener,noreferrer')
+  window.open('https://github.com/ForkKILLET/TodoTree', '_blank')
 }
 
 const handleOutsideClick = (event: MouseEvent) => {
@@ -326,12 +326,6 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-}
-
-.simpleicon {
-  width: 14px;
-  height: 14px;
-  display: block;
 }
 
 .search-input {

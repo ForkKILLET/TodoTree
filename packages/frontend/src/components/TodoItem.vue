@@ -96,7 +96,6 @@
             ref="markdownInput"
             v-model="editContent"
             class="edit-markdown"
-            rows="3"
             @keydown.ctrl.enter.prevent="saveAndExitEdit"
           />
         </template>
@@ -585,7 +584,6 @@ watch(
 
 .edit-markdown {
   flex: 1;
-  min-height: 72px;
   resize: vertical;
   padding: 0;
   border: none;
@@ -594,6 +592,7 @@ watch(
   line-height: 1.5;
   outline: none;
   background: transparent;
+  color: var(--color-text-primary);
 }
 
 .action-btn {

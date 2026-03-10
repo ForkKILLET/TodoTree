@@ -38,7 +38,7 @@ withDefaults(defineProps<Props>(), {
   isDraggable: false
 })
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'toggle-expand', id: string): void
   (e: 'expand-to-matched-descendants', id: string): void
   (e: 'update', id: string, changes: Partial<TodoTreeNode>): void

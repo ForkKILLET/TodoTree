@@ -1,4 +1,4 @@
-import { computed, ref, type ComputedRef } from 'vue'
+import { computed, ref, watch, type WritableComputedRef } from 'vue'
 
 export interface SettingsSection {
   id: string
@@ -14,17 +14,17 @@ export interface SettingItemBase {
 
 export interface BooleanSettingItem extends SettingItemBase {
   type: 'boolean'
-  ref: ComputedRef<boolean>
+  ref: WritableComputedRef<boolean>
 }
 
 export interface StringSettingItem extends SettingItemBase {
   type: 'string'
-  ref: ComputedRef<string>
+  ref: WritableComputedRef<string>
 }
 
 export interface SelectSettingItem extends SettingItemBase {
   type: 'select'
-  ref: ComputedRef<string>
+  ref: WritableComputedRef<string>
   options: Array<{ label: string, value: string | number }>
 }
 
@@ -41,42 +41,68 @@ export interface SettingsData {
 
 export type SettingKey = keyof SettingsData
 
+const STORAGE_KEY = 'todotree.settings'
+
+const getDefaultSettings = (): SettingsData => ({
+  darkMode: !! window.matchMedia?.('(prefers-color-scheme: dark)').matches,
+  defaultMarkdownMode: false,
+  autoSubmitOnBlur: true,
+})
+
+const readStorage = (): SettingsData => {
+  const defaults = getDefaultSettings()
+  if (typeof window === 'undefined') return defaults
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (! raw) return defaults
+    return {
+      ...defaults,
+      ...(JSON.parse(raw) as Partial<SettingsData>)
+    }
+  }
+  catch {
+    return defaults
+  }
+}
+
+const writeStorage = (settings: SettingsData) => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
+}
+
+const applyTheme = (isDarkMode: boolean) => {
+  if (typeof document === 'undefined') return
+  document.documentElement.classList.toggle('dark', isDarkMode)
+}
+
+const settingsData = ref<SettingsData>(readStorage())
+let themeSyncReady = false
+
+const ensureThemeSync = () => {
+  if (themeSyncReady) return
+
+  themeSyncReady = true
+  watch(
+    () => settingsData.value.darkMode,
+    (isDarkMode) => applyTheme(isDarkMode),
+    { immediate: true }
+  )
+}
+
 export function useSettings() {
-  const STORAGE_KEY = 'todotree.settings'
-
-  const DEFAULT_SETTINGS: SettingsData = {
-    darkMode: !! window.matchMedia?.('(prefers-color-scheme: dark)').matches,
-    defaultMarkdownMode: false,
-    autoSubmitOnBlur: true,
-  }
-
-  const readStorage = (): SettingsData => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (! raw) return DEFAULT_SETTINGS
-      return JSON.parse(raw) as SettingsData
-    }
-    catch {
-      return DEFAULT_SETTINGS
-    }
-  }
-
-  const writeStorage = () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsData.value))
-  }
-
-  const settingsData = ref<SettingsData>(readStorage())
+  ensureThemeSync()
 
   const updateSetting = <K extends SettingKey>(key: K, value: SettingsData[K]) => {
     settingsData.value[key] = value
-    writeStorage()
+    writeStorage(settingsData.value)
   }
 
-  const getSettingItemRef = <K extends SettingKey>(key: K): ComputedRef<SettingsData[K]> => computed({
+  const getSettingItemRef = <K extends SettingKey>(key: K): WritableComputedRef<SettingsData[K]> => computed({
     get: () => settingsData.value[key],
     set: (value) => {
       settingsData.value[key] = value
-      writeStorage()
+      writeStorage(settingsData.value)
     },
   })
 

@@ -87,6 +87,7 @@ const iconSize = computed(() => (props.size === 'sm' ? 14 : 18))
 
 .t-button.normal {
   background: var(--color-bg-primary);
+  color: var(--color-text-primary);
 }
 
 .t-button.normal {
@@ -96,6 +97,7 @@ const iconSize = computed(() => (props.size === 'sm' ? 14 : 18))
 .t-button.ghost {
   background: transparent;
   border: none;
+  color: var(--color-text-primary);
 }
 
 .t-button:not(.active, .primary):hover {
