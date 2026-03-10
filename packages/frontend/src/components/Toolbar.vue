@@ -128,7 +128,7 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
-import { TreePine, List, Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, Type, CircleCheck, Hash, Clock, BadgeCheck } from 'lucide-vue-next'
+import { TreePine, List, Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, Type, CircleCheck, Clock, BadgeCheck } from 'lucide-vue-next'
 import StatusDot from './StatusDot.vue'
 import TButton from './TButton.vue'
 import TButtonGroup from './TButtonGroup.vue'
@@ -177,14 +177,13 @@ const statuses: Definition<TodoStatus>[] = [
   { value: 'cancelled', label: 'Cancelled' }
 ]
 const sortFieldsWithIcons: DefinitionWithIcon<SortField>[] = [
-  { value: 'order', label: '顺序', icon: Hash },
   { value: 'createdAt', label: '创建时间', icon: Clock },
   { value: 'updatedAt', label: '更新时间', icon: Clock },
   { value: 'status', label: '状态', icon: BadgeCheck }
 ]
 
 const getSortFieldLabel = (field: SortField) => {
-  return sortFieldsWithIcons.find(f => f.value === field)?.label || '顺序'
+  return sortFieldsWithIcons.find(f => f.value === field)?.label || field
 }
 
 const toggleMenuId = (id: string) => {

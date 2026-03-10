@@ -25,7 +25,7 @@ export interface TodoTreeNode extends Todo {
 
 export type ViewMode = 'tree' | 'flat'
 
-export type SortField = 'createdAt' | 'updatedAt' | 'order' | 'status'
+export type SortField = 'createdAt' | 'updatedAt' | 'status'
 export type SortDirection = 'asc' | 'desc'
 
 export interface FilterOptions {

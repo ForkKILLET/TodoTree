@@ -46,7 +46,7 @@ export function useTodos() {
   const storedViewMode = readStorage<string>(STORAGE_KEYS.viewMode, 'tree')
   const initialViewMode: ViewMode = storedViewMode === 'flat' ? 'flat' : 'tree'
   const initialFilterOptions = readStorage<FilterOptions>(STORAGE_KEYS.filterOptions, {})
-  const initialSortOptions = readStorage<SortOptions>(STORAGE_KEYS.sortOptions, [{ field: 'order', direction: 'asc' }])
+  const initialSortOptions = readStorage<SortOptions>(STORAGE_KEYS.sortOptions, [])
 
   const todos = ref<Todo[]>([])
   const viewMode = ref<ViewMode>(initialViewMode)
@@ -139,6 +139,71 @@ export function useTodos() {
     }
     catch (error) {
       console.error('Failed to update todo:', error)
+      await loadTodos()
+      throw error
+    }
+  }
+
+  const reorderTodos = async (draggedId: string, targetId: string, insertBefore: boolean) => {
+    const draggedIndex = todos.value.findIndex(t => t.id === draggedId)
+    const targetIndex = todos.value.findIndex(t => t.id === targetId)
+
+    if (draggedIndex < 0 || targetIndex < 0) return
+
+    const dragged = todos.value[draggedIndex]
+    const target = todos.value[targetIndex]
+
+    // 确保是同级元素
+    if (dragged.parentId !== target.parentId) return
+
+    // 获取同级所有元素
+    const siblings = todos.value.filter(t => t.parentId === dragged.parentId)
+    siblings.sort((a, b) => a.order - b.order)
+
+    // 找到拖动元素在同级中的位置
+    const draggedSiblingIndex = siblings.findIndex(t => t.id === draggedId)
+    if (draggedSiblingIndex < 0) return
+
+    // 移除拖动的元素
+    siblings.splice(draggedSiblingIndex, 1)
+
+    // 找到目标元素在移除后的数组中的新索引
+    const targetNewIndex = siblings.findIndex(t => t.id === targetId)
+    if (targetNewIndex < 0) return
+
+    // 根据 insertBefore 决定插入位置
+    const insertIndex = insertBefore ? targetNewIndex : targetNewIndex + 1
+    siblings.splice(insertIndex, 0, dragged)
+
+    // 更新所有同级元素的order
+    const updates: Array<{ id: string, order: number }> = []
+    siblings.forEach((todo, index) => {
+      const newOrder = index * 1000 // 使用1000的间隔以便后续插入
+      if (todo.order !== newOrder) {
+        updates.push({ id: todo.id, order: newOrder })
+      }
+    })
+
+    // 批量更新数据库和内存
+    try {
+      const now = Date.now()
+      for (const { id, order } of updates) {
+        await db.updateTodo(id, { order, updatedAt: now })
+        // 同步更新内存中的数据
+        const index = todos.value.findIndex(t => t.id === id)
+        if (index !== - 1) {
+          todos.value[index] = {
+            ...todos.value[index],
+            order,
+            updatedAt: now
+          }
+        }
+      }
+      // 触发响应式更新
+      todos.value = [...todos.value]
+    }
+    catch (error) {
+      console.error('Failed to reorder todos:', error)
       await loadTodos()
       throw error
     }
@@ -433,6 +498,12 @@ export function useTodos() {
   // 排序比较器（级联多步骤排序）
   const compareBySortOptions = (a: TodoTreeNode, b: TodoTreeNode) => {
     const steps = sortOptions.value
+    
+    // 如果没有排序步骤，默认按 order 排序
+    if (steps.length === 0) {
+      return a.order - b.order
+    }
+    
     for (const { field, direction } of steps) {
       let aVal: any
       let bVal: any
@@ -546,7 +617,7 @@ export function useTodos() {
 
   // 设置排序选项
   const setSortOptions = (options: SortOptions) => {
-    sortOptions.value = options.length > 0 ? options : [{ field: 'order', direction: 'asc' }]
+    sortOptions.value = options
     writeStorage(STORAGE_KEYS.sortOptions, sortOptions.value)
   }
 
@@ -562,6 +633,7 @@ export function useTodos() {
     createTodo,
     updateTodo,
     deleteTodo,
+    reorderTodos,
     toggleExpand,
     expandToMatchedDescendants,
     setViewMode,

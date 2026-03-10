@@ -18,17 +18,19 @@
       :todos="displayTodos"
       :is-tree="viewMode === 'tree'"
       :editing-todo-id="editingTodoId"
+      :is-draggable="isDraggable"
       @toggle-expand="toggleExpand"
       @expand-to-matched-descendants="expandToMatchedDescendants"
       @update="handleUpdate"
       @delete="deleteTodo"
       @add-child="handleAddChild"
+      @reorder="handleReorder"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import Toolbar from './components/Toolbar.vue'
 import TodoList from './components/TodoList.vue'
 import { useTodos } from './composables/useTodos'
@@ -45,6 +47,7 @@ const {
   createTodo,
   updateTodo,
   deleteTodo,
+  reorderTodos,
   toggleExpand,
   expandToMatchedDescendants,
   setViewMode,
@@ -53,6 +56,8 @@ const {
 } = useTodos()
 
 const editingTodoId = ref<string | null>(null)
+
+const isDraggable = computed(() => sortOptions.value.length === 0 && viewMode.value === 'tree')
 
 onMounted(async () => {
   await loadTodos()
@@ -90,6 +95,10 @@ const handleUpdate = async (id: string, changes: Partial<TodoTreeNode>) => {
   if (editingTodoId.value === id && Object.prototype.hasOwnProperty.call(changes, 'content')) {
     editingTodoId.value = null
   }
+}
+
+const handleReorder = async (draggedId: string, targetId: string, insertBefore: boolean) => {
+  await reorderTodos(draggedId, targetId, insertBefore)
 }
 </script>
 

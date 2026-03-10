@@ -1,5 +1,19 @@
 <template>
-  <div class="todo-item" :class="{ 'filter-match': todo.isFilterMatch }" :style="{ '--indent-offset': `${level * 30}px` }">
+  <div 
+    class="todo-item" 
+    :class="{ 
+      'filter-match': todo.isFilterMatch,
+      'drag-over-before': dragPosition === 'before',
+      'drag-over-after': dragPosition === 'after'
+    }" 
+    :style="{ '--indent-offset': `${level * 30}px` }"
+    :draggable="isDraggable"
+    @dragstart="handleDragStart"
+    @dragover.prevent="handleDragOver"
+    @dragleave="handleDragLeave"
+    @drop.prevent="handleDrop"
+    @dragend="handleDragEnd"
+  >
     <TButtonGroup class="todo-item-actions" size="sm" :class="{ 'is-visible': isEditing }">
       <TButton
         v-for="button in currentActionButtons"
@@ -101,7 +115,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick, watch, useTemplateRef } from 'vue'
+import { computed, ref, nextTick, watch, useTemplateRef, onMounted, onBeforeUnmount } from 'vue'
 import { marked } from 'marked'
 import TurndownService from 'turndown'
 import { ChevronRight, ChevronDown, ChevronsRight, Pencil, Plus, Trash2, FileCode2, NotebookPen, Check } from 'lucide-vue-next'
@@ -117,12 +131,14 @@ interface Props {
   isTree?: boolean
   level?: number
   shouldAutoEdit?: boolean
+  isDraggable?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isTree: true,
   level: 0,
-  shouldAutoEdit: false
+  shouldAutoEdit: false,
+  isDraggable: false
 })
 
 const emit = defineEmits<{
@@ -131,6 +147,7 @@ const emit = defineEmits<{
   (e: 'update', id: string, changes: Partial<TodoTreeNode>): void
   (e: 'delete', id: string): void
   (e: 'add-child', parentId: string): void
+  (e: 'reorder', draggedId: string, targetId: string, insertBefore: boolean): void
 }>()
 
 const turndownService = new TurndownService({
@@ -146,7 +163,11 @@ const editInput = useTemplateRef('editInput')
 const markdownInput = useTemplateRef('markdownInput')
 const showStatusMenu = ref(false)
 const showDeleteDialog = ref(false)
+const dragPosition = ref<'before' | 'after' | null>(null)
 let hideTimer: ReturnType<typeof setTimeout> | null = null
+const CLEAR_DRAG_INDICATORS_EVENT = 'todotree:clear-drag-indicators'
+const ROOT_PARENT_KEY = '__ROOT__'
+const DRAG_PARENT_KEY = 'application/x-todotree-parent'
 
 interface ActionButton {
   key: string
@@ -198,7 +219,7 @@ const cycleStatus = () => {
 
   const statusCycle: TodoStatus[] = ['todo', 'doing', 'done']
   const currentIndex = statusCycle.indexOf(props.todo.status)
-  const nextIndex = currentIndex === - 1 ? 0 : (currentIndex + 1) % statusCycle.length
+  const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % statusCycle.length
   emit('update', props.todo.id, { status: statusCycle[nextIndex] })
 }
 
@@ -277,6 +298,107 @@ const handleDeleteConfirm = () => {
   emit('delete', props.todo.id)
 }
 
+const clearDragIndicator = () => {
+  dragPosition.value = null
+}
+
+const clearOtherDragIndicators = () => {
+  window.dispatchEvent(new CustomEvent(CLEAR_DRAG_INDICATORS_EVENT, {
+    detail: { sourceId: props.todo.id }
+  }))
+}
+
+const handleGlobalClearIndicators = (event: Event) => {
+  const customEvent = event as CustomEvent<{ sourceId?: string }>
+  if (customEvent.detail?.sourceId === props.todo.id) return
+  clearDragIndicator()
+}
+
+const toParentKey = (parentId: string | null) => parentId ?? ROOT_PARENT_KEY
+
+// 拖动处理
+const handleDragStart = (e: DragEvent) => {
+  if (! props.isDraggable) return
+  e.dataTransfer!.effectAllowed = 'move'
+  e.dataTransfer!.setData('text/plain', props.todo.id)
+  e.dataTransfer!.setData(DRAG_PARENT_KEY, toParentKey(props.todo.parentId))
+  const target = e.currentTarget as HTMLElement
+  target.style.opacity = '0.5'
+}
+
+const handleDragEnd = (e: DragEvent) => {
+  const target = e.currentTarget as HTMLElement
+  target.style.opacity = '1'
+  clearDragIndicator()
+}
+
+const handleDragOver = (e: DragEvent) => {
+  if (! props.isDraggable) return
+  const draggedParentKey = e.dataTransfer?.getData(DRAG_PARENT_KEY)
+  const currentParentKey = toParentKey(props.todo.parentId)
+  const isSameLevel = draggedParentKey === currentParentKey
+
+  if (! isSameLevel) {
+    e.dataTransfer!.dropEffect = 'none'
+    clearDragIndicator()
+    return
+  }
+
+  e.preventDefault()
+  e.dataTransfer!.dropEffect = 'move'
+
+  clearOtherDragIndicators()
+  
+  const target = e.currentTarget as HTMLElement
+  const rect = target.getBoundingClientRect()
+  const midpoint = rect.top + rect.height / 2
+  
+  dragPosition.value = e.clientY < midpoint ? 'before' : 'after'
+}
+
+const handleDragLeave = (e: DragEvent) => {
+  // 只在真正离开元素时清除，避免子元素触发
+  const target = e.currentTarget as HTMLElement
+  const relatedTarget = e.relatedTarget as HTMLElement | null
+  if (! relatedTarget || ! target.contains(relatedTarget)) {
+    clearDragIndicator()
+  }
+}
+
+const handleDrop = (e: DragEvent) => {
+  if (! props.isDraggable) return
+  e.preventDefault()
+
+  const draggedParentKey = e.dataTransfer?.getData(DRAG_PARENT_KEY)
+  const currentParentKey = toParentKey(props.todo.parentId)
+  if (draggedParentKey !== currentParentKey) {
+    clearDragIndicator()
+    return
+  }
+  
+  const draggedId = e.dataTransfer!.getData('text/plain')
+  if (draggedId === props.todo.id) {
+    clearDragIndicator()
+    return
+  }
+  
+  const insertBefore = dragPosition.value === 'before'
+  emit('reorder', draggedId, props.todo.id, insertBefore)
+  clearDragIndicator()
+}
+
+onMounted(() => {
+  window.addEventListener('dragend', clearDragIndicator)
+  window.addEventListener('drop', clearDragIndicator)
+  window.addEventListener(CLEAR_DRAG_INDICATORS_EVENT, handleGlobalClearIndicators)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('dragend', clearDragIndicator)
+  window.removeEventListener('drop', clearDragIndicator)
+  window.removeEventListener(CLEAR_DRAG_INDICATORS_EVENT, handleGlobalClearIndicators)
+})
+
 const defaultActionButtons = computed<ActionButton[]>(() => [
   { key: 'edit', icon: Pencil, tooltip: '编辑', onClick: startEdit },
   { key: 'add-child', icon: Plus, tooltip: '添加子项', onClick: addChild },
@@ -315,6 +437,29 @@ watch(
   gap: 4px;
   margin: 4px 0;
   width: fit-content;
+}
+
+.todo-item[draggable="true"] {
+  cursor: move;
+}
+
+.todo-item.drag-over-before::before,
+.todo-item.drag-over-after::after {
+  content: '';
+  position: absolute;
+  left: calc(var(--indent-offset) + 36px);
+  right: 0;
+  height: 2px;
+  background: var(--color-primary);
+  z-index: 10;
+}
+
+.todo-item.drag-over-before::before {
+  top: -3px;
+}
+
+.todo-item.drag-over-after::after {
+  bottom: -3px;
 }
 
 .todo-item-actions {
