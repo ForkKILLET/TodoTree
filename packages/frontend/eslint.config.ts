@@ -26,6 +26,7 @@ export default [
     },
     rules: {
       semi: 'off',
+      'no-trailing-spaces': 'error',
       '@stylistic/semi': ['error', 'never'],
       '@stylistic/member-delimiter-style': ['error', {
         multiline: { delimiter: 'none' },

@@ -498,12 +498,12 @@ export function useTodos() {
   // 排序比较器（级联多步骤排序）
   const compareBySortOptions = (a: TodoTreeNode, b: TodoTreeNode) => {
     const steps = sortOptions.value
-    
+
     // 如果没有排序步骤，默认按 order 排序
     if (steps.length === 0) {
       return a.order - b.order
     }
-    
+
     for (const { field, direction } of steps) {
       let aVal: any
       let bVal: any
@@ -555,7 +555,7 @@ export function useTodos() {
     if (viewMode.value === 'tree') {
       const tree = buildTree(todos.value)
       const sortedTree = sortTreeNodes(tree)
-      
+
       // 在树上应用筛选（保留匹配节点及其祖先）
       const matchedIds = new Set<string>()
       const filteredTree = filterTreeNodes(sortedTree, matchedIds)

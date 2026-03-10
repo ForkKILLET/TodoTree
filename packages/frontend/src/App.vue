@@ -11,9 +11,9 @@
       @add-root="handleAddRoot"
       @settings-open="showSettings = true"
     />
-    
+
     <div v-if="loading" class="loading">加载中…</div>
-    
+
     <TodoList
       v-else
       :todos="displayTodos"
@@ -71,7 +71,7 @@ const isDraggable = computed(() => sortOptions.value.length === 0 && viewMode.va
 
 onMounted(async () => {
   await loadTodos()
-  
+
   // 如果没有数据，添加一些示例数据
   if (displayTodos.value.length === 0) {
     await createTodo('欢迎使用 **TodoTree**\n\n这是一个树形 Todo 管理应用')

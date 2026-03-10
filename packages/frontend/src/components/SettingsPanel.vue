@@ -15,7 +15,7 @@
     <div class="settings-content">
       <div v-for="section in sections" :key="section.id" class="settings-section">
         <h3 class="settings-section-title">{{ section.label }}</h3>
-        
+
         <div class="settings-items">
           <div v-for="item in section.items" :key="item.key" class="settings-item">
             <label class="settings-item-label">
@@ -25,7 +25,7 @@
                   {{ item.description }}
                 </span>
               </div>
-              
+
               <input
                 v-if="item.type === 'boolean'"
                 type="checkbox"

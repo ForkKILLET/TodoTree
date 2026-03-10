@@ -67,7 +67,7 @@
 
       <TButton
         size="sm"
-        theme="primary" 
+        theme="primary"
         square
         :icon="Plus"
         tooltip="添加根项"

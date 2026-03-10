@@ -7,7 +7,7 @@ export class TodoDatabase extends Dexie {
 
   constructor() {
     super('TodoTreeDB')
-    
+
     this.version(1).stores({
       todos: 'id, parentId, status, createdAt, updatedAt, order'
     })
@@ -37,7 +37,7 @@ export class TodoDatabase extends Dexie {
         await this.deleteTodo(childId)
       }
     }
-    
+
     // 删除自己
     await this.todos.delete(id)
 

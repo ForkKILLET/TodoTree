@@ -25,14 +25,14 @@ export const vTooltip: Directive<HTMLElement, string> = {
         tooltipEl = document.createElement('span')
         tooltipEl.className = 'tooltip'
         tooltipEl.textContent = text
-        
+
         const rect = el.getBoundingClientRect()
         const left = rect.left + rect.width / 2
         const top = rect.bottom + 2
-        
+
         tooltipEl.style.left = `${left}px`
         tooltipEl.style.top = `${top}px`
-        
+
         document.body.appendChild(tooltipEl)
       }, TOOLTIP_DELAY)
     }

@@ -1,11 +1,11 @@
 <template>
-  <div 
-    class="todo-item" 
-    :class="{ 
+  <div
+    class="todo-item"
+    :class="{
       'filter-match': todo.isFilterMatch,
       'drag-over-before': dragPosition === 'before',
       'drag-over-after': dragPosition === 'after'
-    }" 
+    }"
     :style="{ '--indent-offset': `${level * 30}px` }"
     :draggable="isDraggable"
     @dragstart="handleDragStart"
@@ -26,7 +26,7 @@
         @click="button.onClick"
       />
     </TButtonGroup>
-    
+
     <div class="todo-item-wrapper">
       <TButton
         v-if="isTree && todo.children.length > 0"
@@ -119,7 +119,7 @@
 import { computed, inject, ref, nextTick, watch, useTemplateRef, onMounted, onBeforeUnmount } from 'vue'
 import { marked } from 'marked'
 import TurndownService from 'turndown'
-import { ChevronRight, ChevronDown, ChevronsRight, Pencil, Plus, Trash2, FileCode2, NotebookPen, Check } from 'lucide-vue-next'
+import { ChevronRight, ChevronDown, ChevronsRight, Pencil, Plus, Trash2, FileCode2, NotebookPen, Check, X } from 'lucide-vue-next'
 import type { Component } from 'vue'
 import StatusDot from './StatusDot.vue'
 import TButton from './TButton.vue'
@@ -270,6 +270,18 @@ const saveAndExitEdit = () => {
   isEditing.value = false
 }
 
+const discardEdit = () => {
+  // 如果是新添加还没有内容的 todo 项，直接删除
+  if (props.todo.content === '') {
+    emit('delete', props.todo.id)
+    return
+  }
+
+  // 否则只是取消编辑，恢复原内容
+  isEditing.value = false
+  editContent.value = props.todo.content
+}
+
 const handleEditorBlur = (event: FocusEvent) => {
   if (! autoSubmitOnBlur.value || ! isEditing.value) return
 
@@ -374,11 +386,11 @@ const handleDragOver = (e: DragEvent) => {
   e.dataTransfer!.dropEffect = 'move'
 
   clearOtherDragIndicators()
-  
+
   const target = e.currentTarget as HTMLElement
   const rect = target.getBoundingClientRect()
   const midpoint = rect.top + rect.height / 2
-  
+
   dragPosition.value = e.clientY < midpoint ? 'before' : 'after'
 }
 
@@ -401,13 +413,13 @@ const handleDrop = (e: DragEvent) => {
     clearDragIndicator()
     return
   }
-  
+
   const draggedId = e.dataTransfer!.getData('text/plain')
   if (draggedId === props.todo.id) {
     clearDragIndicator()
     return
   }
-  
+
   const insertBefore = dragPosition.value === 'before'
   emit('reorder', draggedId, props.todo.id, insertBefore)
   clearDragIndicator()
@@ -438,6 +450,7 @@ const editingActionButtons = computed<ActionButton[]>(() => [
     tooltip: editMode.value === 'wysiwyg' ? '切换为 Markdown 源码模式' : '切换为所见即所得模式',
     onClick: toggleEditMode,
   },
+  { key: 'discard-edit', icon: X, tooltip: '丢弃编辑', onClick: discardEdit },
   { key: 'done-edit', icon: Check, tooltip: '完成编辑', onClick: saveAndExitEdit }
 ])
 
