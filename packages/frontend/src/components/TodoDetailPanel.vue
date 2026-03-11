@@ -406,7 +406,7 @@ const dueDateRelative = computed(() => {
   const abs = Math.abs(diff)
   let amount: string
   if (abs < 3_600_000) amount = `${Math.round(abs / 60_000)} 分钟`
-  else if (abs < 86_400_000) amount = `${Math.round(abs / 3_600_000)} 小时`
+  else if (abs < 172_800_000) amount = `${Math.round(abs / 3_600_000)} 小时`
   else amount = `${Math.round(abs / 86_400_000)} 天`
   return `${amount}${diff >= 0 ? '后' : '前'}`
 })
