@@ -1,12 +1,3 @@
-import type { TodoStatus } from '../types/todo'
-
-export const STATUS_COLORS: Record<TodoStatus, string> = {
-  todo: '#808080',
-  doing: '#3b82f6',
-  done: '#22c55e',
-  cancelled: '#ef4444'
-}
-
 export const COLORS = {
   primary: '#3b82f6',
   primaryHover: '#2563eb',

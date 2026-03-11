@@ -9,6 +9,7 @@
 import { computed } from 'vue'
 import StatusDot from './StatusDot.vue'
 import type { TodoStatus } from '../types/todo'
+import { STATUSES } from '../constants/definition'
 
 interface Props {
   status: TodoStatus
@@ -19,14 +20,7 @@ const props = withDefaults(defineProps<Props>(), {
   dotSize: 14
 })
 
-const statusMap = {
-  todo: 'Todo',
-  doing: 'Doing',
-  done: 'Done',
-  cancelled: 'Cancelled'
-} as const
-
-const text = computed(() => statusMap[props.status])
+const text = computed(() => STATUSES[props.status].label)
 </script>
 
 <style scoped>

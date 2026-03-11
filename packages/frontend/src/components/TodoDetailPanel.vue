@@ -46,19 +46,12 @@
           <span class="attr-label">状态</span>
           <div class="attr-value">
             <TodoStatusSelector
-              :status="todo.status"
+              :status="todo.computedStatus || todo.status"
               :show-label="true"
               :dot-size="18"
               :show-ring="! isLeaf"
               :distribution="todo.leafStatusDistribution"
               @change="handleStatusChange"
-            />
-            <TodoStatusLabel
-              v-if="isLeaf && todo.computedStatus && todo.computedStatus !== todo.status"
-              :status="todo.computedStatus"
-              :dot-size="16"
-              v-tooltip="'子项推导状态'"
-              class="computed-status-label"
             />
           </div>
         </div>
@@ -91,12 +84,10 @@
 import { computed, inject, toRef, ref, watch, nextTick, type Component } from 'vue'
 import { CircleCheck, CalendarPlus2, CalendarClock, Pencil, FileCode2, NotebookPen, Check, X } from 'lucide-vue-next'
 import TSidePanel from './TSidePanel.vue'
-import TodoStatusLabel from './TodoStatusLabel.vue'
 import TodoStatusSelector from './TodoStatusSelector.vue'
 import TButton from './TButton.vue'
 import TButtonGroup from './TButtonGroup.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
-import { vTooltip } from '../directives/tooltip'
 import type { TodoTreeNode, TodoStatus } from '../types/todo'
 import { settingsDataInjectionKey } from '../injectionKeys/settings'
 import { useTodoContentEditor } from '../composables/useTodoContentEditor'

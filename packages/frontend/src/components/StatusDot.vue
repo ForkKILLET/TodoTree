@@ -31,7 +31,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { TodoStatus, StatusDistribution } from '../types/todo'
-import { STATUS_COLORS } from '../constants/colors'
+import { STATUSES } from '../constants/definition'
 
 interface Props {
   status: TodoStatus
@@ -56,7 +56,7 @@ const radius = computed(() => props.size / 2)
 const ringWidth = 4
 const ringRadius = computed(() => radius.value - ringWidth / 2)
 const circumference = computed(() => 2 * Math.PI * ringRadius.value)
-const statusColor = computed(() => STATUS_COLORS[props.status])
+const statusColor = computed(() => STATUSES[props.status].color)
 
 const segments = computed(() => {
   const orderedStatuses: TodoStatus[] = ['todo', 'doing', 'done', 'cancelled']
@@ -65,7 +65,7 @@ const segments = computed(() => {
   if (total === 0) {
     return [{
       status: props.status,
-      color: STATUS_COLORS[props.status],
+      color: STATUSES[props.status].color,
       length: circumference.value,
       offset: 0
     }]
@@ -80,7 +80,7 @@ const segments = computed(() => {
       const length = circumference.value * ratio
       const segment = {
         status,
-        color: STATUS_COLORS[status],
+        color: STATUSES[status].color,
         length,
         offset: - accumulated
       }

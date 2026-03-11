@@ -17,16 +17,16 @@
     <template #panel="{ close }">
       <div class="status-option-list">
         <button
-          v-for="opt in statusOptions"
-          :key="opt.value"
+          v-for="{ label }, optStatus in STATUSES"
+          :key="optStatus"
           type="button"
           class="status-option"
-          :class="{ 'is-active': opt.value === status }"
-          @click.stop="handleSelect(opt.value, close)"
+          :class="{ 'is-active': status === optStatus }"
+          @click.stop="handleSelect(optStatus, close)"
         >
-          <StatusDot :status="opt.value" :size="12" />
-          <span>{{ opt.label }}</span>
-          <Check v-if="opt.value === status" :size="12" class="check-icon" />
+          <StatusDot :status="optStatus" :size="12" />
+          <span>{{ label }}</span>
+          <Check v-if="status === optStatus" :size="12" class="check-icon" />
         </button>
       </div>
     </template>
@@ -39,6 +39,7 @@ import { Check } from 'lucide-vue-next'
 import TDropdown from './TDropdown.vue'
 import StatusDot from './StatusDot.vue'
 import type { TodoStatus, StatusDistribution } from '../types/todo'
+import { STATUSES, STATUS_CYCLE } from '../constants/definition'
 
 interface Props {
   status: TodoStatus
@@ -62,22 +63,13 @@ const emit = defineEmits<{
 // 非叶子节点（showRing）不允许交互
 const isInteractive = computed(() => ! props.showRing)
 
-const statusOptions: { value: TodoStatus, label: string }[] = [
-  { value: 'todo', label: 'Todo' },
-  { value: 'doing', label: 'Doing' },
-  { value: 'done', label: 'Done' },
-  { value: 'cancelled', label: 'Cancelled' }
-]
-
-const currentLabel = computed(() => statusOptions.find(o => o.value === props.status)?.label ?? props.status)
-
-const cyclableStatuses: TodoStatus[] = ['todo', 'doing', 'done']
+const currentLabel = computed(() => STATUSES[props.status].label)
 
 const handleClick = (e: MouseEvent) => {
   if (! isInteractive.value) return
   e.stopPropagation()
-  const idx = cyclableStatuses.indexOf(props.status)
-  const next = cyclableStatuses[(idx < 0 ? 0 : idx + 1) % cyclableStatuses.length]
+  const idx = STATUS_CYCLE.indexOf(props.status)
+  const next = STATUS_CYCLE[(idx < 0 ? 0 : idx + 1) % STATUS_CYCLE.length]
   emit('change', next)
 }
 

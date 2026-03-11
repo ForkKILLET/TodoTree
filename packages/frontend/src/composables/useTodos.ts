@@ -136,6 +136,10 @@ export function useTodos() {
           updatedAt: Date.now()
         }
       }
+
+      if (changes.status !== undefined) {
+        await updateParentStatuses(id)
+      }
     }
     catch (error) {
       console.error('Failed to update todo:', error)
@@ -275,6 +279,13 @@ export function useTodos() {
     cancelled: 0
   })
 
+  const computeStatusByChildren = (childStatuses: TodoStatus[]): TodoStatus => {
+    if (childStatuses.every(s => s === 'cancelled')) return 'cancelled'
+    if (childStatuses.every(s => s === 'done')) return 'done'
+    if (childStatuses.every(s => s === 'todo')) return 'todo'
+    return 'doing'
+  }
+
   const computeStatus = (todo: Todo, todoMap: Map<string, Todo>): { status: TodoStatus, leafStatusDistribution: StatusDistribution } => {
     if (todo.children.length === 0) {
       const distribution = createEmptyDistribution()
@@ -294,26 +305,42 @@ export function useTodos() {
 
     // 计算状态
     const childStatuses = todo.children.map(childId => {
-      const child = todoMap.get(childId)
-      if (! child) return 'todo'
+      const child = todoMap.get(childId)!
       return computeStatus(child, todoMap).status
     })
 
-    let status: TodoStatus
-    if (childStatuses.every(s => s === 'cancelled')) {
-      status = 'cancelled'
-    }
-    else if (childStatuses.every(s => s === 'done')) {
-      status = 'done'
-    }
-    else if (childStatuses.every(s => s === 'todo')) {
-      status = 'todo'
-    }
-    else {
-      status = 'doing'
-    }
+    const status = computeStatusByChildren(childStatuses)
+    console.log('%s: %o -> %s', todo.content, childStatuses, status)
 
     return { status, leafStatusDistribution }
+  }
+
+  const updateParentStatuses = async (changedId: string) => {
+    const todoMap = new Map<string, Todo>()
+    todos.value.forEach(todo => todoMap.set(todo.id, todo))
+
+    let current = todoMap.get(changedId)
+    while (current?.parentId) {
+      const parent = todoMap.get(current.parentId)
+      if (! parent) break
+
+      const { status: newStatus } = computeStatus(parent, todoMap)
+
+      if (newStatus !== parent.status) {
+        const updatedAt = Date.now()
+        await db.updateTodo(parent.id, { status: newStatus })
+
+        const parentIndex = todos.value.findIndex(t => t.id === parent.id)
+        if (parentIndex !== - 1) {
+          todos.value[parentIndex] = { ...todos.value[parentIndex], status: newStatus, updatedAt }
+        }
+
+        // keep todoMap up-to-date for the next iteration
+        todoMap.set(parent.id, { ...parent, status: newStatus, updatedAt })
+      }
+
+      current = todoMap.get(current.parentId)
+    }
   }
 
   // 构建树形结构
@@ -435,7 +462,7 @@ export function useTodos() {
         return { kept: null, hasMatchInSubtree: false, hasCollapsedMatchInSubtree: false }
       }
 
-      const hasCollapsedBySelf = hasSearchText && ! node.isExpanded && keptChildren.length
+      const hasCollapsedBySelf = hasSearchText && ! node.isExpanded && keptChildren.length > 0
       const hasCollapsedByDescendant = hasSearchText && childResults.some(result => result.hasCollapsedMatchInSubtree)
       const hasCollapsedMatchInSubtree = hasCollapsedBySelf || hasCollapsedByDescendant
 

@@ -47,7 +47,7 @@
         @click="handleSelect"
       >
         <TodoStatusSelector
-          :status="todo.status"
+          :status="todo.computedStatus || todo.status"
           :show-ring="! isLeaf"
           :distribution="todo.leafStatusDistribution"
           :dot-size="16"
@@ -478,7 +478,6 @@ watch(
 
 .markdown {
   flex: 1;
-  cursor: text;
   min-height: 28px;
   line-height: 1.5;
 }

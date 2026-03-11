@@ -3,7 +3,7 @@
     <div class="toolbar-section toolbar-main-row">
       <TButtonGroup size="sm">
         <TButton
-          v-for="{ value, label, icon } in viewModes"
+          v-for="{ value, label, icon } in VIEW_MODES"
           :active="viewMode === value"
           :icon="icon"
           :key="value"
@@ -53,7 +53,7 @@
         />
         <div v-if="openMenuId === 'sort-main'" class="menu-panel">
           <button
-            v-for="field in sortFieldsWithIcons"
+            v-for="field in SORT_FIELDS"
             :key="field.value"
             type="button"
             class="menu-item"
@@ -101,7 +101,7 @@
         </button>
         <div v-if="openMenuId === 'filter-step'" class="menu-panel">
           <button
-            v-for="status in statuses"
+            v-for="status in STATUS_LIST"
             :key="`step-${status.value}`"
             type="button"
             :class="['menu-item', { active: selectedStatuses.includes(status.value) }]"
@@ -137,14 +137,15 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
-import { TreePine, List, Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, CircleCheck, Settings, CalendarPlus2, CalendarClock } from 'lucide-vue-next'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, Settings } from 'lucide-vue-next'
 import { GitHubIcon } from 'vue3-simple-icons'
 import TodoStatusLabel from './TodoStatusLabel.vue'
 import TButton from './TButton.vue'
 import TButtonGroup from './TButtonGroup.vue'
 import TInput from './TInput.vue'
 import type { TodoStatus, ViewMode, SortField, SortDirection, SortStep } from '../types/todo'
+import { VIEW_MODES, SORT_FIELDS, STATUS_LIST } from '../constants/definition'
 
 interface Props {
   viewMode: ViewMode
@@ -169,33 +170,8 @@ const sortSteps = ref<SortStep[]>(JSON.parse(JSON.stringify(props.sortSteps)))
 const hasFilterStep = ref(selectedStatuses.value.length > 0)
 const openMenuId = ref<string | null>(null)
 
-interface Definition<T> {
-  label: string
-  value: T
-}
-
-interface DefinitionWithIcon<T> extends Definition<T> {
-  icon: Component
-}
-
-const viewModes: DefinitionWithIcon<ViewMode>[] = [
-  { value: 'tree', label: '树形视图', icon: TreePine },
-  { value: 'flat', label: '列表视图', icon: List }
-]
-const statuses: Definition<TodoStatus>[] = [
-  { value: 'todo', label: 'Todo' },
-  { value: 'doing', label: 'Doing' },
-  { value: 'done', label: 'Done' },
-  { value: 'cancelled', label: 'Cancelled' }
-]
-const sortFieldsWithIcons: DefinitionWithIcon<SortField>[] = [
-  { value: 'createdAt', label: '创建时间', icon: CalendarPlus2 },
-  { value: 'updatedAt', label: '更新时间', icon: CalendarClock },
-  { value: 'status', label: '状态', icon: CircleCheck }
-]
-
 const getSortFieldLabel = (field: SortField) => {
-  return sortFieldsWithIcons.find(f => f.value === field)?.label || field
+  return SORT_FIELDS.find(f => f.value === field)?.label || field
 }
 
 const toggleMenuId = (id: string) => {
