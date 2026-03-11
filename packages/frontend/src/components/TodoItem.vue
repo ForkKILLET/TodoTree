@@ -47,7 +47,7 @@
         @click="handleSelect"
       >
         <TodoStatusSelector
-          :status="todo.computedStatus || todo.status"
+          :status="todo.status"
           :show-ring="! isLeaf"
           :distribution="todo.leafStatusDistribution"
           :dot-size="16"
@@ -79,6 +79,15 @@
             @keydown.ctrl.enter.prevent="saveAndExitEdit"
           />
         </template>
+
+        <span
+          v-if="todo.dueAt"
+          class="due-clock"
+          :style="{ color: dueTimerColor }"
+          :title="dueTimerTitle"
+        >
+          <Timer :size="13" />
+        </span>
       </div>
     </div>
   </div>
@@ -95,7 +104,7 @@
 
 <script setup lang="ts">
 import { computed, inject, ref, watch, onMounted, onBeforeUnmount, toRef } from 'vue'
-import { ChevronRight, ChevronDown, ChevronsRight, Pencil, Plus, Trash2, FileCode2, NotebookPen, Check, X } from 'lucide-vue-next'
+import { ChevronRight, ChevronDown, ChevronsRight, Pencil, Plus, Trash2, FileCode2, NotebookPen, Check, X, Timer } from 'lucide-vue-next'
 import type { Component } from 'vue'
 import TButton from '@/components/TButton.vue'
 import TodoStatusSelector from '@/components/TodoStatusSelector.vue'
@@ -104,6 +113,7 @@ import TButtonGroup from '@/components/TButtonGroup.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { settingsDataInjectionKey } from '@/injectionKeys/settings'
 import { useTodoContentEditor } from '@/composables/useTodoContentEditor'
+import { useNow } from '@/composables/useNow'
 
 interface Props {
   todo: TodoTreeNode
@@ -158,6 +168,39 @@ const defaultMarkdownMode = computed(() => settingsData?.value.defaultMarkdownMo
 const autoSubmitOnBlur = computed(() => settingsData?.value.autoSubmitOnBlur ?? true)
 
 const isLeaf = computed(() => props.todo.children.length === 0)
+
+const now = useNow()
+const ONE_DAY = 86_400_000
+const warningMs = computed(() => (settingsData?.value.dueWarningDays ?? 3) * ONE_DAY)
+
+const dueTimerColor = computed(() => {
+  const ts = props.todo.dueAt
+  if (! ts) return ''
+  const remaining = ts - now.value
+  if (remaining > warningMs.value) return 'var(--color-text-secondary)'
+  // lerp gray (128,128,128) → red (239,68,68) as remaining → 0 (or past)
+  const t = Math.max(0, Math.min(1, 1 - remaining / warningMs.value))
+  const r = Math.round(128 + 111 * t)
+  const g = Math.round(128 - 60 * t)
+  const b = Math.round(128 - 60 * t)
+  return `rgb(${r},${g},${b})`
+})
+
+const dueTimerTitle = computed(() => {
+  const ts = props.todo.dueAt
+  if (! ts) return ''
+  const d = new Date(ts)
+  const dateStr = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  const diff = ts - now.value
+  const abs = Math.abs(diff)
+  let rel: string
+  if (abs < 3_600_000) rel = `${Math.round(abs / 60_000)} 分钟`
+  else if (abs < ONE_DAY) rel = `${Math.round(abs / 3_600_000)} 小时`
+  else rel = `${Math.round(abs / ONE_DAY)} 天`
+  return diff >= 0
+    ? `截止 ${dateStr}（${rel}后）`
+    : `截止 ${dateStr}（已过期 ${rel}前）`
+})
 
 const {
   isEditing,
@@ -548,5 +591,14 @@ watch(
 
 .action-btn:hover {
   background: var(--color-bg-hover);
+}
+
+.due-clock {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-right: 2px;
+  transition: color 0.4s;
 }
 </style>

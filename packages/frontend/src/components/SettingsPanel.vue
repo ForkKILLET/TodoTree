@@ -20,6 +20,18 @@
                 class="settings-toggle"
                 v-model="item.ref.value"
               />
+              <div v-else-if="item.type === 'number'" class="settings-number-input">
+                <input
+                  type="number"
+                  class="settings-number"
+                  :min="item.min"
+                  :max="item.max"
+                  :step="item.step ?? 1"
+                  :value="item.ref.value"
+                  @change="item.ref.value = Number(($event.target as HTMLInputElement).value)"
+                />
+                <span v-if="item.unit" class="settings-number-unit">{{ item.unit }}</span>
+              </div>
             </label>
           </div>
         </div>
@@ -99,6 +111,36 @@ const sections = getSections()
 .settings-item-description {
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
+}
+
+.settings-number-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.settings-number {
+  width: 64px;
+  padding: 3px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  text-align: center;
+  outline: none;
+}
+
+.settings-number:focus {
+  border-color: var(--color-primary);
+}
+
+.settings-number-unit {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
 }
 
 .settings-toggle {

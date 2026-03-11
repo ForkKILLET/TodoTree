@@ -138,7 +138,7 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, Settings } from 'lucide-vue-next'
+import { Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, Settings, CircleCheck } from 'lucide-vue-next'
 import { GitHubIcon } from 'vue3-simple-icons'
 import TodoStatusLabel from '@/components/TodoStatusLabel.vue'
 import TButton from '@/components/TButton.vue'

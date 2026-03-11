@@ -11,6 +11,10 @@ export class TodoDatabase extends Dexie {
     this.version(1).stores({
       todos: 'id, parentId, status, createdAt, updatedAt, order'
     })
+
+    this.version(2).stores({
+      todos: 'id, parentId, status, createdAt, updatedAt, order, dueAt'
+    })
   }
 
   async getAllTodos(): Promise<Todo[]> {

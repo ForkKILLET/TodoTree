@@ -11,13 +11,13 @@ export interface Todo {
   createdAt: number
   updatedAt: number
   order: number
+  dueAt?: number | null
 }
 
 export interface TodoTreeNode extends Todo {
   childNodes?: TodoTreeNode[]
   level: number
   isExpanded?: boolean
-  computedStatus?: TodoStatus
   leafStatusDistribution?: StatusDistribution
   isFilterMatch?: boolean
   hasCollapsedMatchedDescendant?: boolean
@@ -25,7 +25,7 @@ export interface TodoTreeNode extends Todo {
 
 export type ViewMode = 'tree' | 'flat'
 
-export type SortField = 'createdAt' | 'updatedAt' | 'status'
+export type SortField = 'createdAt' | 'updatedAt' | 'status' | 'dueAt'
 export type SortDirection = 'asc' | 'desc'
 
 export interface FilterOptions {

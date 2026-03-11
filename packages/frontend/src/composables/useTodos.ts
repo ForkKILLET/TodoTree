@@ -82,7 +82,8 @@ export function useTodos() {
       children: [],
       createdAt: now,
       updatedAt: now,
-      order: now
+      order: now,
+      dueAt: null,
     }
 
     try {
@@ -310,7 +311,6 @@ export function useTodos() {
     })
 
     const status = computeStatusByChildren(childStatuses)
-    console.log('%s: %o -> %s', todo.content, childStatuses, status)
 
     return { status, leafStatusDistribution }
   }
@@ -357,7 +357,7 @@ export function useTodos() {
           ...todo,
           level: 0,
           isExpanded: expandedIds.value.has(todo.id),
-          computedStatus: status,
+          status,
           leafStatusDistribution
         }
         rootNodes.push(node)
@@ -380,7 +380,7 @@ export function useTodos() {
             ...child,
             level: node.level + 1,
             isExpanded: expandedIds.value.has(child.id),
-            computedStatus: status,
+            status,
             leafStatusDistribution
           }
           return buildChildren(childNode)
@@ -418,7 +418,7 @@ export function useTodos() {
       return {
         ...todo,
         level: 0,
-        computedStatus: status,
+        status,
         leafStatusDistribution
       }
     })
@@ -427,7 +427,7 @@ export function useTodos() {
   // 检查节点是否匹配筛选条件
   const nodeMatchesFilter = (node: TodoTreeNode): boolean => {
     if (filterOptions.value.status && filterOptions.value.status.length) {
-      if (! filterOptions.value.status.includes(node.computedStatus || node.status)) {
+      if (! filterOptions.value.status.includes(node.status)) {
         return false
       }
     }
@@ -508,7 +508,7 @@ export function useTodos() {
 
     if (filterOptions.value.status && filterOptions.value.status.length) {
       filtered = filtered.filter(item =>
-        filterOptions.value.status!.includes(item.computedStatus || item.status)
+        filterOptions.value.status!.includes(item.status)
       )
     }
 
@@ -532,20 +532,22 @@ export function useTodos() {
     }
 
     for (const { field, direction } of steps) {
-      let aVal: any
-      let bVal: any
+      let aVal, bVal: string | number
 
       if (field === 'status') {
-        aVal = a.computedStatus || a.status
-        bVal = b.computedStatus || b.status
+        aVal = a.status
+        bVal = b.status
+      }
+      else if (field === 'dueAt') {
+        aVal = a.dueAt ?? Infinity
+        bVal = b.dueAt ?? Infinity
       }
       else {
         aVal = a[field]
         bVal = b[field]
       }
 
-      if (aVal < bVal) return direction === 'asc' ? - 1 : 1
-      if (aVal > bVal) return direction === 'asc' ? 1 : - 1
+      return (aVal < bVal) === (direction === 'asc') ? - 1 : 1
     }
     return 0
   }

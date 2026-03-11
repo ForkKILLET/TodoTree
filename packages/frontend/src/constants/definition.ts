@@ -1,4 +1,4 @@
-import { TreePine, List, CalendarPlus2, CalendarClock, CircleCheck } from 'lucide-vue-next'
+import { TreePine, List, CalendarPlus2, CalendarClock, CircleCheck, Timer } from 'lucide-vue-next'
 import type { TodoStatus, ViewMode, SortField } from '@/types/todo'
 import type { Component } from 'vue'
 
@@ -34,4 +34,5 @@ export const SORT_FIELDS: DefinitionWithIcon<SortField>[] = [
   { value: 'createdAt', label: '创建时间', icon: CalendarPlus2 },
   { value: 'updatedAt', label: '更新时间', icon: CalendarClock },
   { value: 'status',    label: '状态',    icon: CircleCheck },
+  { value: 'dueAt',    label: '截止时间', icon: Timer },
 ]

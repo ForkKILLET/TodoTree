@@ -46,7 +46,7 @@
           <span class="attr-label">状态</span>
           <div class="attr-value">
             <TodoStatusSelector
-              :status="todo.computedStatus || todo.status"
+              :status="todo.status"
               :show-label="true"
               :dot-size="18"
               :show-ring="! isLeaf"
@@ -65,6 +65,59 @@
           <span class="attr-label">修改时间</span>
           <span class="attr-value">{{ updatedAtLabel }}</span>
         </div>
+        <div class="detail-attr-row">
+          <span class="attr-icon"><Timer :size="16" /></span>
+          <span class="attr-label">截止时间</span>
+          <div class="attr-value due-date-value">
+            <div v-if="isDueDateEditing" class="due-date-inputs">
+              <input
+                ref="dueDateInputEl"
+                type="date"
+                class="due-date-input"
+                :value="dueDateDateValue"
+                @change="handleDueDateDateChange"
+                @keydown.esc="isDueDateEditing = false"
+                @keydown.enter.prevent="isDueDateEditing = false"
+              />
+              <input
+                ref="dueDateTimeInputEl"
+                type="time"
+                class="due-date-input due-date-time-input"
+                :value="dueDateTimeValue"
+                placeholder="23:59"
+                @change="handleDueDateTimeChange"
+                @blur="handleDueDateBlur"
+                @keydown.esc="isDueDateEditing = false"
+                @keydown.enter.prevent="isDueDateEditing = false"
+              />
+            </div>
+            <template v-else>
+              <span
+                class="due-date-display"
+                :class="{ 'is-empty': ! todo.dueAt }"
+                :style="{ color: dueColor }"
+                @click="startDueDateEdit"
+              >{{ dueDateDisplay }}</span>
+              <template v-if="!! dueDateRelative">
+                <span class="due-date-bar">|</span>
+                <span
+                  class="due-date-relative"
+                  :style="{ color: dueColor }"
+                >{{ dueDateRelative }}</span>
+              </template>
+              <TButton
+                v-if="!! todo.dueAt"
+                size="xs"
+                square
+                theme="ghost"
+                :icon="X"
+                tooltip="清除截止时间"
+                class="due-date-clear"
+                @click.stop="handleDueDateClear"
+              />
+            </template>
+          </div>
+        </div>
       </div>
     </div>
   </TSidePanel>
@@ -82,12 +135,13 @@
 
 <script setup lang="ts">
 import { computed, inject, toRef, ref, watch, nextTick, type Component } from 'vue'
-import { CircleCheck, CalendarPlus2, CalendarClock, Pencil, FileCode2, NotebookPen, Check, X } from 'lucide-vue-next'
+import { CircleCheck, CalendarPlus2, CalendarClock, Pencil, FileCode2, NotebookPen, Check, X, Timer } from 'lucide-vue-next'
 import TSidePanel from '@/components/TSidePanel.vue'
 import TodoStatusSelector from '@/components/TodoStatusSelector.vue'
 import TButton from '@/components/TButton.vue'
 import TButtonGroup from '@/components/TButtonGroup.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { useNow } from '@/composables/useNow'
 import type { TodoTreeNode, TodoStatus } from '@/types/todo'
 import { settingsDataInjectionKey } from '@/injectionKeys/settings'
 import { useTodoContentEditor } from '@/composables/useTodoContentEditor'
@@ -296,6 +350,111 @@ const updatedAtLabel = computed(() => {
   if (! props.todo) return ''
   return new Date(props.todo.updatedAt).toLocaleString('zh-CN')
 })
+
+// ── Due date ────────────────────────────────────────────────────────────────
+const isDueDateEditing = ref(false)
+const dueDateInputEl = ref<HTMLInputElement | null>(null)
+const dueDateTimeInputEl = ref<HTMLInputElement | null>(null)
+const now = useNow()
+
+// helpers — produce YYYY-MM-DD and HH:mm strings from the current dueAt
+const dueDateDateValue = computed(() => {
+  const ts = props.todo?.dueAt
+  if (! ts) return ''
+  const d = new Date(ts)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+})
+
+const dueDateTimeValue = computed(() => {
+  const ts = props.todo?.dueAt
+  if (! ts) return ''
+  const d = new Date(ts)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+})
+
+const dueDateDisplay = computed(() => {
+  const ts = props.todo?.dueAt
+  if (! ts) return '无'
+  const d = new Date(ts)
+  const YYYY = d.getFullYear()
+  const M = d.getMonth() + 1
+  const D = d.getDate()
+  const HH = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${YYYY}/${M}/${D} ${HH}:${mm}`
+})
+
+const ONE_DAY = 86_400_000
+const warningMs = computed(() => (settingsData?.value.dueWarningDays ?? 3) * ONE_DAY)
+
+const dueColor = computed(() => {
+  const ts = props.todo?.dueAt
+  if (! ts) return undefined
+  const remaining = ts - now.value
+  if (remaining > warningMs.value) return 'var(--color-text-secondary)'
+  const t = Math.max(0, Math.min(1, 1 - remaining / warningMs.value))
+  const r = Math.round(128 + 111 * t)
+  const g = Math.round(128 - 60 * t)
+  const b = Math.round(128 - 60 * t)
+  return `rgb(${r},${g},${b})`
+})
+
+const dueDateRelative = computed(() => {
+  const ts = props.todo?.dueAt
+  if (! ts) return null
+  const diff = ts - now.value
+  const abs = Math.abs(diff)
+  let amount: string
+  if (abs < 3_600_000) amount = `${Math.round(abs / 60_000)} 分钟`
+  else if (abs < 86_400_000) amount = `${Math.round(abs / 3_600_000)} 小时`
+  else amount = `${Math.round(abs / 86_400_000)} 天`
+  return `${amount}${diff >= 0 ? '后' : '前'}`
+})
+
+// resolve current editing inputs → timestamp; time defaults to 23:59 if omitted
+const resolveTimestamp = (): number | null => {
+  const dateVal = dueDateInputEl.value?.value
+  if (! dateVal) return null
+  const timeVal = dueDateTimeInputEl.value?.value || '23:59'
+  return new Date(`${dateVal}T${timeVal}`).getTime()
+}
+
+const startDueDateEdit = async () => {
+  isDueDateEditing.value = true
+  await nextTick()
+  dueDateInputEl.value?.showPicker?.()
+  dueDateInputEl.value?.focus()
+}
+
+const handleDueDateDateChange = () => {
+  if (! props.todo) return
+  const ts = resolveTimestamp()
+  if (ts === null) return
+  emit('update', props.todo.id, { dueAt: ts })
+  // keep editor open so user can optionally adjust the time
+}
+
+const handleDueDateTimeChange = () => {
+  if (! props.todo) return
+  const ts = resolveTimestamp()
+  if (ts === null) return
+  emit('update', props.todo.id, { dueAt: ts })
+}
+
+const handleDueDateBlur = () => {
+  // only close after both inputs have had a chance to receive events
+  setTimeout(() => {
+    const active = document.activeElement
+    if (active !== dueDateInputEl.value && active !== dueDateTimeInputEl.value) {
+      isDueDateEditing.value = false
+    }
+  }, 100)
+}
+
+const handleDueDateClear = () => {
+  if (! props.todo) return
+  emit('update', props.todo.id, { dueAt: null })
+}
 </script>
 
 <style scoped>
@@ -406,6 +565,7 @@ const updatedAtLabel = computed(() => {
   justify-content: center;
   color: var(--color-text-secondary);
   flex-shrink: 0;
+  transition: color 0.4s;
 }
 
 .attr-label {
@@ -417,13 +577,71 @@ const updatedAtLabel = computed(() => {
 .attr-value {
   display: flex;
   align-items: center;
-  gap: 6px;
+  padding-left: 6px;
   font-size: var(--text-base);
   color: var(--color-text-secondary);
 }
 
-.computed-status-label {
-  opacity: 0.6;
+.due-date-value {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  gap: 6px;
+}
+
+.due-date-display {
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  padding: 2px 6px;
+  margin: 0 -6px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s, color 0.4s;
+  white-space: nowrap;
+}
+
+.due-date-display:hover {
+  background: var(--color-bg-hover);
+}
+
+.due-date-display.is-empty {
+  opacity: 0.5;
+}
+
+.due-date-relative {
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  transition: color 0.4s;
+}
+
+.due-date-clear {
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.due-date-value:hover .due-date-clear {
+  opacity: 1;
+}
+
+.due-date-inputs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.due-date-input {
   font-size: var(--text-sm);
+  font-family: inherit;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  color: var(--color-text-primary);
+  outline: none;
+  flex-shrink: 0;
+}
+
+.due-date-time-input {
+  width: 90px;
 }
 </style>

@@ -32,7 +32,13 @@ const props = withDefaults(defineProps<Props>(), {
   type: 'button'
 })
 
-const iconSize = computed(() => (props.size === 'sm' ? 14 : 18))
+const ICON_SIZE_MAP = {
+  xs: 12,
+  sm: 14,
+  md: 18
+}
+
+const iconSize = computed(() => ICON_SIZE_MAP[props.size])
 </script>
 
 <style scoped>

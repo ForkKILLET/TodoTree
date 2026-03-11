@@ -2,14 +2,14 @@
   <div class="side-panel" v-show="isOpen">
     <div class="side-panel-header">
       <h2>{{ title }}</h2>
-      <button
-        type="button"
-        class="side-panel-close"
+      <TButton
+        size="sm"
+        square
+        theme="ghost"
+        :icon="X"
+        tooltip="关闭"
         @click="emit('close')"
-        v-tooltip="'关闭'"
-      >
-        <X :size="20" />
-      </button>
+      />
     </div>
 
     <div class="side-panel-content">
@@ -20,7 +20,7 @@
 
 <script setup lang="ts">
 import { X } from 'lucide-vue-next'
-import { vTooltip } from '@/directives/tooltip'
+import TButton from '@/components/TButton.vue'
 
 interface Props {
   isOpen: boolean
@@ -60,24 +60,6 @@ const emit = defineEmits<{
   margin: 0;
   font-size: var(--text-lg);
   font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.side-panel-close {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-secondary);
-  border-radius: var(--radius-md);
-  transition: var(--transition-fast);
-}
-
-.side-panel-close:hover {
-  background: var(--color-bg-hover);
   color: var(--color-text-primary);
 }
 

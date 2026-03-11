@@ -28,15 +28,26 @@ export interface SelectSettingItem extends SettingItemBase {
   options: Array<{ label: string, value: string | number }>
 }
 
+export interface NumberSettingItem extends SettingItemBase {
+  type: 'number'
+  ref: WritableComputedRef<number>
+  min?: number
+  max?: number
+  step?: number
+  unit?: string
+}
+
 export type SettingItem =
   | BooleanSettingItem
   | StringSettingItem
   | SelectSettingItem
+  | NumberSettingItem
 
 export interface SettingsData {
   darkMode: boolean
   defaultMarkdownMode: boolean
   autoSubmitOnBlur: boolean
+  dueWarningDays: number
 }
 
 export type SettingKey = keyof SettingsData
@@ -47,6 +58,7 @@ const getDefaultSettings = (): SettingsData => ({
   darkMode: !! window.matchMedia?.('(prefers-color-scheme: dark)').matches,
   defaultMarkdownMode: false,
   autoSubmitOnBlur: true,
+  dueWarningDays: 3,
 })
 
 const readStorage = (): SettingsData => {
@@ -134,6 +146,23 @@ export function useSettings() {
           label: '失去焦点时提交编辑',
           type: 'boolean',
           ref: getSettingItemRef('autoSubmitOnBlur'),
+        }
+      ]
+    },
+    {
+      id: 'due',
+      label: '截止管理',
+      items: [
+        {
+          key: 'dueWarningDays',
+          label: '危险剩余时间',
+          description: '小于此天数时，截止时间图标和文字开始渐变为红色',
+          type: 'number',
+          ref: getSettingItemRef('dueWarningDays') as WritableComputedRef<number>,
+          min: 1,
+          max: 30,
+          step: 1,
+          unit: '天',
         }
       ]
     }
