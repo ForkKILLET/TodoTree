@@ -8,7 +8,8 @@
     "dev": "rsbuild dev --open",
     "preview": "rsbuild preview",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "check": "vue-tsc --noEmit"
   },
   "dependencies": {
     "dexie": "^4.3.0",
@@ -29,6 +30,7 @@
     "globals": "^17.4.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1",
-    "vue-eslint-parser": "^10.4.0"
+    "vue-eslint-parser": "^10.4.0",
+    "vue-tsc": "^3.2.5"
   }
 }
