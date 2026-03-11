@@ -399,7 +399,7 @@ export function useTodos() {
 
   // 检查节点是否匹配筛选条件
   const nodeMatchesFilter = (node: TodoTreeNode): boolean => {
-    if (filterOptions.value.status && filterOptions.value.status.length > 0) {
+    if (filterOptions.value.status && filterOptions.value.status.length) {
       if (! filterOptions.value.status.includes(node.computedStatus || node.status)) {
         return false
       }
@@ -435,7 +435,7 @@ export function useTodos() {
         return { kept: null, hasMatchInSubtree: false, hasCollapsedMatchInSubtree: false }
       }
 
-      const hasCollapsedBySelf = hasSearchText && ! node.isExpanded && keptChildren.length > 0
+      const hasCollapsedBySelf = hasSearchText && ! node.isExpanded && keptChildren.length
       const hasCollapsedByDescendant = hasSearchText && childResults.some(result => result.hasCollapsedMatchInSubtree)
       const hasCollapsedMatchInSubtree = hasCollapsedBySelf || hasCollapsedByDescendant
 
@@ -479,7 +479,7 @@ export function useTodos() {
   const applyFilter = (items: TodoTreeNode[]): TodoTreeNode[] => {
     let filtered = items
 
-    if (filterOptions.value.status && filterOptions.value.status.length > 0) {
+    if (filterOptions.value.status && filterOptions.value.status.length) {
       filtered = filtered.filter(item =>
         filterOptions.value.status!.includes(item.computedStatus || item.status)
       )

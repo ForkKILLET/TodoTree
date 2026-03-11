@@ -29,7 +29,7 @@
 
     <div class="todo-item-wrapper">
       <TButton
-        v-if="isTree && todo.children.length > 0"
+        v-if="isTree && todo.children.length"
         :class="['expand-btn', { 'expand-to-match': todo.hasCollapsedMatchedDescendant }]"
         size="sm"
         theme="ghost"
@@ -40,52 +40,30 @@
       />
       <div v-else-if="isTree" class="expand-placeholder"></div>
 
-      <div class="todo-item-content">
-        <div
-          class="status-indicator"
-          @mouseenter="showStatusMenu = true"
-          @mouseleave="handleStatusLeave"
-          @click="cycleStatus"
-        >
-          <StatusDot
-            :status="currentStatus"
-            :show-ring="!isLeaf"
-            :distribution="todo.leafStatusDistribution"
-            :size="24"
-          />
-
-          <div v-if="showStatusMenu && isLeaf" class="status-menu">
-            <div
-              class="status-menu-content"
-              @mouseenter="cancelHideTimer"
-              @mouseleave="handleStatusLeave"
-            >
-              <TButton
-                v-for="status in statusOptions"
-                :key="status"
-                :class="['status-option', { active: props.todo.status === status }]"
-                size="xs"
-                theme="ghost"
-                square
-                :tooltip="status"
-                @click.stop="setStatus(status)"
-              >
-                <StatusDot :status="status" :size="16" />
-              </TButton>
-            </div>
-          </div>
-        </div>
+      <div
+        class="todo-item-content"
+        :class="{ 'detail-active': isDetailActive }"
+        data-editor-root
+        @click="handleSelect"
+      >
+        <TodoStatusSelector
+          :status="todo.status"
+          :show-ring="! isLeaf"
+          :distribution="todo.leafStatusDistribution"
+          :dot-size="16"
+          @change="setStatus"
+        />
 
         <div
           v-if="! isEditing"
           class="markdown"
           v-html="renderedContent"
-          @dblclick="startEdit"
+          @dblclick="startListEdit"
         ></div>
         <template v-else>
           <div
             v-if="editMode === 'wysiwyg'"
-            ref="editInput"
+            :ref="setEditInputRef"
             class="markdown edit-contenteditable"
             contenteditable="true"
             @input="handleEditInput"
@@ -94,7 +72,7 @@
           ></div>
           <textarea
             v-else
-            ref="markdownInput"
+            :ref="setMarkdownInputRef"
             v-model="editContent"
             class="edit-markdown"
             @blur="handleEditorBlur"
@@ -116,17 +94,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, ref, nextTick, watch, useTemplateRef, onMounted, onBeforeUnmount } from 'vue'
-import { marked } from 'marked'
-import TurndownService from 'turndown'
+import { computed, inject, ref, watch, onMounted, onBeforeUnmount, toRef } from 'vue'
 import { ChevronRight, ChevronDown, ChevronsRight, Pencil, Plus, Trash2, FileCode2, NotebookPen, Check, X } from 'lucide-vue-next'
 import type { Component } from 'vue'
-import StatusDot from './StatusDot.vue'
 import TButton from './TButton.vue'
+import TodoStatusSelector from './TodoStatusSelector.vue'
 import type { TodoTreeNode, TodoStatus } from '../types/todo'
 import TButtonGroup from './TButtonGroup.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import { settingsDataInjectionKey } from '../injectionKeys/settings'
+import { useTodoContentEditor } from '../composables/useTodoContentEditor'
 
 interface Props {
   todo: TodoTreeNode
@@ -134,13 +111,19 @@ interface Props {
   level?: number
   shouldAutoEdit?: boolean
   isDraggable?: boolean
+  isDetailActive?: boolean
+  externalDraft?: string | null
+  forceExit?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isTree: true,
   level: 0,
   shouldAutoEdit: false,
-  isDraggable: false
+  isDraggable: false,
+  isDetailActive: false,
+  externalDraft: null,
+  forceExit: false
 })
 
 const emit = defineEmits<{
@@ -150,23 +133,14 @@ const emit = defineEmits<{
   (e: 'delete', id: string): void
   (e: 'add-child', parentId: string): void
   (e: 'reorder', draggedId: string, targetId: string, insertBefore: boolean): void
+  (e: 'select', id: string): void
+  (e: 'edit-start', id: string, content: string, source: 'list' | 'detail'): void
+  (e: 'edit-change', id: string, content: string, source: 'list' | 'detail'): void
+  (e: 'edit-end', id: string, content: string, source: 'list' | 'detail', saved: boolean): void
 }>()
 
-const turndownService = new TurndownService({
-  headingStyle: 'atx',
-  codeBlockStyle: 'fenced',
-  emDelimiter: '*'
-})
-
-const isEditing = ref(false)
-const editMode = ref<'wysiwyg' | 'markdown'>('wysiwyg')
-const editContent = ref('')
-const editInput = useTemplateRef('editInput')
-const markdownInput = useTemplateRef('markdownInput')
-const showStatusMenu = ref(false)
 const showDeleteDialog = ref(false)
 const dragPosition = ref<'before' | 'after' | null>(null)
-let hideTimer: ReturnType<typeof setTimeout> | null = null
 const CLEAR_DRAG_INDICATORS_EVENT = 'todotree:clear-drag-indicators'
 const ROOT_PARENT_KEY = '__ROOT__'
 const DRAG_PARENT_KEY = 'application/x-todotree-parent'
@@ -183,137 +157,73 @@ const settingsData = inject(settingsDataInjectionKey, null)
 const defaultMarkdownMode = computed(() => settingsData?.value.defaultMarkdownMode ?? false)
 const autoSubmitOnBlur = computed(() => settingsData?.value.autoSubmitOnBlur ?? true)
 
-const currentStatus = computed(() => props.todo.computedStatus || props.todo.status)
 const isLeaf = computed(() => props.todo.children.length === 0)
-const statusOptions: TodoStatus[] = ['todo', 'doing', 'done', 'cancelled']
 
-const renderedContent = computed(() => {
-  try {
-    return marked.parse(props.todo.content, { async: false }) as string
-  }
-  catch {
-    return props.todo.content
+const {
+  isEditing,
+  editMode,
+  editContent,
+  renderedContent,
+  setEditInputRef,
+  setMarkdownInputRef,
+  startEdit,
+  handleEditInput,
+  saveAndExitEdit,
+  discardEdit,
+  handleEditorBlur,
+  toggleEditMode
+} = useTodoContentEditor({
+  sourceContent: toRef(() => props.externalDraft ?? props.todo.content),
+  defaultMarkdownMode,
+  autoSubmitOnBlur,
+  onSave: (content: string) => {
+    emit('update', props.todo.id, { content })
   }
 })
 
-const renderedEditContent = computed(() => {
-  try {
-    const content = marked.parse(editContent.value, { async: false })
-    return content.replace(/\n/g, '')
-  }
-  catch {
-    return editContent.value
-  }
+const startListEdit = async () => {
+  await startEdit()
+  emit('edit-start', props.todo.id, editContent.value, 'list')
+}
+
+const saveListEditAndExit = () => {
+  saveAndExitEdit()
+  emit('edit-end', props.todo.id, editContent.value, 'list', true)
+}
+
+const stopListEdit = (saved: boolean) => {
+  emit('edit-end', props.todo.id, editContent.value, 'list', saved)
+  discardEdit()
+}
+
+watch(editContent, content => {
+  if (! isEditing.value) return
+  emit('edit-change', props.todo.id, content, 'list')
 })
 
-const handleStatusLeave = () => {
-  if (! isLeaf.value) return
-  hideTimer = setTimeout(() => {
-    showStatusMenu.value = false
-  }, 200)
-}
-
-const cancelHideTimer = () => {
-  if (hideTimer) {
-    clearTimeout(hideTimer)
-    hideTimer = null
+watch(
+  () => props.forceExit,
+  forceExit => {
+    if (! forceExit || ! isEditing.value) return
+    stopListEdit(false)
   }
-}
-
-const cycleStatus = () => {
-  if (! isLeaf.value) return
-
-  const statusCycle: TodoStatus[] = ['todo', 'doing', 'done']
-  const currentIndex = statusCycle.indexOf(props.todo.status)
-  const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % statusCycle.length
-  emit('update', props.todo.id, { status: statusCycle[nextIndex] })
-}
+)
 
 const setStatus = (status: TodoStatus) => {
   emit('update', props.todo.id, { status })
-  showStatusMenu.value = false
 }
 
-const startEdit = () => {
-  isEditing.value = true
-  editContent.value = props.todo.content
-  editMode.value = defaultMarkdownMode.value ? 'markdown' : 'wysiwyg'
-  nextTick(() => {
-    if (editMode.value === 'markdown') {
-      markdownInput.value?.focus()
-      const len = markdownInput.value?.value.length ?? 0
-      markdownInput.value?.setSelectionRange(len, len)
-      return
-    }
-
-    if (! editInput.value) return
-
-    editInput.value.innerHTML = renderedEditContent.value
-    editInput.value.focus()
-  })
+const handleSelect = () => {
+  emit('select', props.todo.id)
 }
 
-const handleEditInput = () => {
-  if (! editInput.value) return
-  editContent.value = turndownService.turndown(editInput.value.innerHTML)
-}
-
-const saveEdit = () => {
-  if (editInput.value) {
-    editContent.value = turndownService.turndown(editInput.value.innerHTML)
-  }
-  emit('update', props.todo.id, { content: editContent.value })
-}
-
-const saveAndExitEdit = () => {
-  saveEdit()
-  isEditing.value = false
-}
-
-const discardEdit = () => {
-  // 如果是新添加还没有内容的 todo 项，直接删除
+const handleDiscardEdit = () => {
   if (props.todo.content === '') {
     emit('delete', props.todo.id)
     return
   }
 
-  // 否则只是取消编辑，恢复原内容
-  isEditing.value = false
-  editContent.value = props.todo.content
-}
-
-const handleEditorBlur = (event: FocusEvent) => {
-  if (! autoSubmitOnBlur.value || ! isEditing.value) return
-
-  const currentTarget = event.currentTarget as HTMLElement | null
-  const todoItem = currentTarget?.closest('.todo-item')
-  const nextTarget = event.relatedTarget as Node | null
-
-  if (todoItem && nextTarget && todoItem.contains(nextTarget)) {
-    return
-  }
-
-  saveAndExitEdit()
-}
-
-const toggleEditMode = () => {
-  if (editMode.value === 'wysiwyg') {
-    handleEditInput()
-    editMode.value = 'markdown'
-    nextTick(() => {
-      markdownInput.value?.focus()
-      const len = markdownInput.value?.value.length ?? 0
-      markdownInput.value?.setSelectionRange(len, len)
-    })
-    return
-  }
-
-  editMode.value = 'wysiwyg'
-  nextTick(() => {
-    if (! editInput.value) return
-    editInput.value.innerHTML = renderedEditContent.value
-    editInput.value.focus()
-  })
+  stopListEdit(false)
 }
 
 const addChild = () => {
@@ -438,7 +348,7 @@ onBeforeUnmount(() => {
 })
 
 const defaultActionButtons = computed<ActionButton[]>(() => [
-  { key: 'edit', icon: Pencil, tooltip: '编辑', onClick: startEdit },
+  { key: 'edit', icon: Pencil, tooltip: '编辑', onClick: () => { void startListEdit() } },
   { key: 'add-child', icon: Plus, tooltip: '添加子项', onClick: addChild },
   { key: 'delete', icon: Trash2, tooltip: '删除', onClick: remove }
 ])
@@ -448,10 +358,10 @@ const editingActionButtons = computed<ActionButton[]>(() => [
     key: 'toggle-edit-mode',
     icon: editMode.value === 'wysiwyg' ? FileCode2 : NotebookPen,
     tooltip: editMode.value === 'wysiwyg' ? '切换为 Markdown 源码模式' : '切换为所见即所得模式',
-    onClick: toggleEditMode,
+    onClick: () => { void toggleEditMode() },
   },
-  { key: 'discard-edit', icon: X, tooltip: '丢弃编辑', onClick: discardEdit },
-  { key: 'done-edit', icon: Check, tooltip: '完成编辑', onClick: saveAndExitEdit }
+  { key: 'discard-edit', icon: X, tooltip: '丢弃编辑', onClick: handleDiscardEdit },
+  { key: 'done-edit', icon: Check, tooltip: '完成编辑', onClick: saveListEditAndExit }
 ])
 
 const currentActionButtons = computed(() => {
@@ -462,7 +372,7 @@ watch(
   () => props.shouldAutoEdit,
   shouldAutoEdit => {
     if (shouldAutoEdit && ! isEditing.value) {
-      startEdit()
+      void startListEdit()
     }
   },
   { immediate: true }
@@ -547,6 +457,10 @@ watch(
   border-color: var(--color-primary);
 }
 
+.todo-item-content.detail-active {
+  border-color: var(--color-primary);
+}
+
 .expand-btn {
   flex-shrink: 0;
 }
@@ -561,11 +475,6 @@ watch(
   flex-shrink: 0;
 }
 
-.status-indicator {
-  cursor: pointer;
-  flex-shrink: 0;
-  position: relative;
-}
 
 .markdown {
   flex: 1;
@@ -640,28 +549,5 @@ watch(
 
 .action-btn:hover {
   background: var(--color-bg-hover);
-}
-
-.status-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 20;
-  pointer-events: none;
-}
-
-.status-menu-content {
-  pointer-events: auto;
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  padding: 6px;
-}
-
-.status-option {
-  position: relative;
 }
 </style>

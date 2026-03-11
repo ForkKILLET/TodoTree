@@ -8,12 +8,19 @@
       :level="isTree ? todo.level : 0"
       :should-auto-edit="editingTodoId === todo.id"
       :is-draggable="isDraggable"
+      :is-detail-active="selectedTodoId === todo.id"
+      :external-draft="editDrafts[todo.id] ?? null"
+      :force-exit="forceExitTodoId === todo.id && forceExitKey > 0"
       @toggle-expand="(id) => emit('toggle-expand', id)"
       @expand-to-matched-descendants="(id) => emit('expand-to-matched-descendants', id)"
       @update="(id, changes) => emit('update', id, changes)"
       @delete="(id) => emit('delete', id)"
       @add-child="(parentId) => emit('add-child', parentId)"
       @reorder="(draggedId, targetId, insertBefore) => emit('reorder', draggedId, targetId, insertBefore)"
+      @select="(id) => emit('select', id)"
+      @edit-start="(id, content, source) => emit('edit-start', id, content, source)"
+      @edit-change="(id, content, source) => emit('edit-change', id, content, source)"
+      @edit-end="(id, content, source, saved) => emit('edit-end', id, content, source, saved)"
     />
     <div v-if="todos.length === 0" class="empty-state">
       暂无 Todo 项
@@ -30,12 +37,20 @@ interface Props {
   isTree?: boolean
   editingTodoId?: string | null
   isDraggable?: boolean
+  selectedTodoId?: string | null
+  editDrafts?: Record<string, string>
+  forceExitTodoId?: string | null
+  forceExitKey?: number
 }
 
 withDefaults(defineProps<Props>(), {
   isTree: true,
   editingTodoId: null,
-  isDraggable: false
+  isDraggable: false,
+  selectedTodoId: null,
+  editDrafts: () => ({}),
+  forceExitTodoId: null,
+  forceExitKey: 0
 })
 
 const emit = defineEmits<{
@@ -45,6 +60,10 @@ const emit = defineEmits<{
   (e: 'delete', id: string): void
   (e: 'add-child', parentId: string): void
   (e: 'reorder', draggedId: string, targetId: string, insertBefore: boolean): void
+  (e: 'select', id: string): void
+  (e: 'edit-start', id: string, content: string, source: 'list' | 'detail'): void
+  (e: 'edit-change', id: string, content: string, source: 'list' | 'detail'): void
+  (e: 'edit-end', id: string, content: string, source: 'list' | 'detail', saved: boolean): void
 }>()
 </script>
 

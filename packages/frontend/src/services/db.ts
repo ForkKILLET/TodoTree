@@ -32,7 +32,7 @@ export class TodoDatabase extends Dexie {
   async deleteTodo(id: string): Promise<void> {
     // 先删除所有子节点
     const todo = await this.getTodoById(id)
-    if (todo && todo.children.length > 0) {
+    if (todo && todo.children.length) {
       for (const childId of todo.children) {
         await this.deleteTodo(childId)
       }
@@ -52,9 +52,6 @@ export class TodoDatabase extends Dexie {
   }
 
   async getTodosByParentId(parentId: string | null): Promise<Todo[]> {
-    if (parentId === null) {
-      return await this.todos.filter(todo => todo.parentId === null).toArray()
-    }
     return await this.todos.filter(todo => todo.parentId === parentId).toArray()
   }
 

@@ -1,17 +1,5 @@
 <template>
-  <div class="settings-panel" v-show="isOpen">
-    <div class="settings-header">
-      <h2>设置</h2>
-      <button
-        type="button"
-        class="settings-close"
-        @click="emit('close')"
-        v-tooltip="'关闭'"
-      >
-        <X :size="20" />
-      </button>
-    </div>
-
+  <TSidePanel :is-open="isOpen" title="设置" @close="emit('close')">
     <div class="settings-content">
       <div v-for="section in sections" :key="section.id" class="settings-section">
         <h3 class="settings-section-title">{{ section.label }}</h3>
@@ -37,13 +25,12 @@
         </div>
       </div>
     </div>
-  </div>
+  </TSidePanel>
 </template>
 
 <script setup lang="ts">
-import { X } from 'lucide-vue-next'
+import TSidePanel from './TSidePanel.vue'
 import { useSettings } from '../composables/useSettings'
-import { vTooltip } from '../directives/tooltip'
 
 interface Props {
   isOpen: boolean
@@ -60,56 +47,8 @@ const sections = getSections()
 </script>
 
 <style scoped>
-.settings-panel {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(100vw, 360px);
-  z-index: 999;
-  display: flex;
-  flex-direction: column;
-  background: var(--color-bg-primary);
-  border-left: 1px solid var(--color-border);
-}
-
-.settings-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.settings-header h2 {
-  margin: 0;
-  font-size: var(--text-lg);
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.settings-close {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-secondary);
-  border-radius: var(--radius-md);
-  transition: var(--transition-fast);
-}
-
-.settings-close:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text-primary);
-}
-
 .settings-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
+  padding: 0;
 }
 
 .settings-section {

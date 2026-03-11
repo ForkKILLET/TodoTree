@@ -85,7 +85,7 @@
         <TButton
           size="sm"
           square
-          :icon="Github"
+          :icon="GitHubIcon"
           tooltip="GitHub"
           @click="openGithub"
         >
@@ -93,7 +93,7 @@
       </div>
     </div>
 
-    <div v-if="hasFilterStep || sortSteps.length > 0" class="toolbar-section">
+    <div v-if="hasFilterStep || sortSteps.length" class="toolbar-section">
       <div v-if="hasFilterStep" class="menu-anchor">
         <button type="button" class="step-chip" @click="toggleMenuId('filter-step')">
           <Funnel :size="14" class="step-chip-icon" />
@@ -107,8 +107,7 @@
             :class="['menu-item', { active: selectedStatuses.includes(status.value) }]"
             @click="toggleStatus(status.value)"
           >
-            <StatusDot :status="status.value" :size="14" />
-            <span>{{ status.label }}</span>
+            <TodoStatusLabel :status="status.value" :dot-size="14" />
           </button>
           <button type="button" class="menu-item danger" @click="removeFilterStep">
             <Trash2 :size="14" />
@@ -139,8 +138,9 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
-import { TreePine, List, Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, CircleCheck, Clock, Settings, Github } from 'lucide-vue-next'
-import StatusDot from './StatusDot.vue'
+import { TreePine, List, Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, CircleCheck, Settings, CalendarPlus2, CalendarClock } from 'lucide-vue-next'
+import { GitHubIcon } from 'vue3-simple-icons'
+import TodoStatusLabel from './TodoStatusLabel.vue'
 import TButton from './TButton.vue'
 import TButtonGroup from './TButtonGroup.vue'
 import TInput from './TInput.vue'
@@ -189,8 +189,8 @@ const statuses: Definition<TodoStatus>[] = [
   { value: 'cancelled', label: 'Cancelled' }
 ]
 const sortFieldsWithIcons: DefinitionWithIcon<SortField>[] = [
-  { value: 'createdAt', label: '创建时间', icon: Clock },
-  { value: 'updatedAt', label: '更新时间', icon: Clock },
+  { value: 'createdAt', label: '创建时间', icon: CalendarPlus2 },
+  { value: 'updatedAt', label: '更新时间', icon: CalendarClock },
   { value: 'status', label: '状态', icon: CircleCheck }
 ]
 

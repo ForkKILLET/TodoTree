@@ -57,7 +57,8 @@ export default [
       indent: 'off',
       'vue/script-indent': ['error', 2, { baseIndent: 0, switchCase: 1 }],
       'vue/html-indent': ['error', 2],
-      'vue/multi-word-component-names': 'off'
+      'vue/multi-word-component-names': 'off',
+      'vue/space-unary-ops': ['error', { words: true, nonwords: true }],
     }
   }
 ] satisfies Linter.Config[]

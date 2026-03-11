@@ -52,7 +52,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const center = computed(() => props.size / 2)
-const radius = computed(() => props.size / 2 - 3)
+const radius = computed(() => props.size / 2)
 const ringWidth = 4
 const ringRadius = computed(() => radius.value - ringWidth / 2)
 const circumference = computed(() => 2 * Math.PI * ringRadius.value)
