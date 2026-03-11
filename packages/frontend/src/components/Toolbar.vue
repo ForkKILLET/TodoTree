@@ -140,12 +140,12 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, Settings } from 'lucide-vue-next'
 import { GitHubIcon } from 'vue3-simple-icons'
-import TodoStatusLabel from './TodoStatusLabel.vue'
-import TButton from './TButton.vue'
-import TButtonGroup from './TButtonGroup.vue'
-import TInput from './TInput.vue'
-import type { TodoStatus, ViewMode, SortField, SortDirection, SortStep } from '../types/todo'
-import { VIEW_MODES, SORT_FIELDS, STATUS_LIST } from '../constants/definition'
+import TodoStatusLabel from '@/components/TodoStatusLabel.vue'
+import TButton from '@/components/TButton.vue'
+import TButtonGroup from '@/components/TButtonGroup.vue'
+import TInput from '@/components/TInput.vue'
+import type { TodoStatus, ViewMode, SortField, SortDirection, SortStep } from '@/types/todo'
+import { VIEW_MODES, SORT_FIELDS, STATUS_LIST } from '@/constants/definition'
 
 interface Props {
   viewMode: ViewMode

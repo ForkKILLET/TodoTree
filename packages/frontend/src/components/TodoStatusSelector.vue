@@ -36,10 +36,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Check } from 'lucide-vue-next'
-import TDropdown from './TDropdown.vue'
-import StatusDot from './StatusDot.vue'
-import type { TodoStatus, StatusDistribution } from '../types/todo'
-import { STATUSES, STATUS_CYCLE } from '../constants/definition'
+import TDropdown from '@/components/TDropdown.vue'
+import StatusDot from '@/components/StatusDot.vue'
+import type { TodoStatus, StatusDistribution } from '@/types/todo'
+import { STATUSES, STATUS_CYCLE } from '@/constants/definition'
 
 interface Props {
   status: TodoStatus

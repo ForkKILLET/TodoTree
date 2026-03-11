@@ -30,8 +30,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { TodoStatus, StatusDistribution } from '../types/todo'
-import { STATUSES } from '../constants/definition'
+import type { TodoStatus, StatusDistribution } from '@/types/todo'
+import { STATUSES } from '@/constants/definition'
 
 interface Props {
   status: TodoStatus

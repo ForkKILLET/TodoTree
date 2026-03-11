@@ -7,9 +7,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import StatusDot from './StatusDot.vue'
-import type { TodoStatus } from '../types/todo'
-import { STATUSES } from '../constants/definition'
+import StatusDot from '@/components/StatusDot.vue'
+import type { TodoStatus } from '@/types/todo'
+import { STATUSES } from '@/constants/definition'
 
 interface Props {
   status: TodoStatus

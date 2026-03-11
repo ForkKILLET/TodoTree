@@ -1,5 +1,5 @@
 import { TreePine, List, CalendarPlus2, CalendarClock, CircleCheck } from 'lucide-vue-next'
-import type { TodoStatus, ViewMode, SortField } from '../types/todo'
+import type { TodoStatus, ViewMode, SortField } from '@/types/todo'
 import type { Component } from 'vue'
 
 export interface Definition<T extends string = string> {
@@ -22,7 +22,7 @@ export const STATUSES: Record<TodoStatus, { label: string, color: string }> = {
 export const STATUS_LIST: Definition<TodoStatus>[] = (Object.keys(STATUSES) as TodoStatus[])
   .map(value => ({ value, label: STATUSES[value].label }))
 
-/** Statuses that cycle on click (excludes cancelled) */
+/** 点击时轮换的 Todo 状态（不包括 Cancelled） */
 export const STATUS_CYCLE: TodoStatus[] = ['todo', 'doing', 'done']
 
 export const VIEW_MODES: DefinitionWithIcon<ViewMode>[] = [

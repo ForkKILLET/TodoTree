@@ -20,7 +20,7 @@
 
 <script setup lang="ts">
 import { X } from 'lucide-vue-next'
-import { vTooltip } from '../directives/tooltip'
+import { vTooltip } from '@/directives/tooltip'
 
 interface Props {
   isOpen: boolean

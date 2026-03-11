@@ -24,7 +24,7 @@
 </template>
 
 <script setup lang="ts">
-import TButton from './TButton.vue'
+import TButton from '@/components/TButton.vue'
 
 interface Props {
   modelValue: boolean

@@ -8,5 +8,5 @@ export default defineConfig({
   },
   output: {
     assetPrefix: './',
-  }
+  },
 })

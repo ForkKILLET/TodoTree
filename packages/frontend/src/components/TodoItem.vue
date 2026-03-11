@@ -97,13 +97,13 @@
 import { computed, inject, ref, watch, onMounted, onBeforeUnmount, toRef } from 'vue'
 import { ChevronRight, ChevronDown, ChevronsRight, Pencil, Plus, Trash2, FileCode2, NotebookPen, Check, X } from 'lucide-vue-next'
 import type { Component } from 'vue'
-import TButton from './TButton.vue'
-import TodoStatusSelector from './TodoStatusSelector.vue'
-import type { TodoTreeNode, TodoStatus } from '../types/todo'
-import TButtonGroup from './TButtonGroup.vue'
-import ConfirmDialog from './ConfirmDialog.vue'
-import { settingsDataInjectionKey } from '../injectionKeys/settings'
-import { useTodoContentEditor } from '../composables/useTodoContentEditor'
+import TButton from '@/components/TButton.vue'
+import TodoStatusSelector from '@/components/TodoStatusSelector.vue'
+import type { TodoTreeNode, TodoStatus } from '@/types/todo'
+import TButtonGroup from '@/components/TButtonGroup.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { settingsDataInjectionKey } from '@/injectionKeys/settings'
+import { useTodoContentEditor } from '@/composables/useTodoContentEditor'
 
 interface Props {
   todo: TodoTreeNode

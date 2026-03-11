@@ -54,14 +54,14 @@
 
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, computed, provide } from 'vue'
-import Toolbar from './components/Toolbar.vue'
-import TodoList from './components/TodoList.vue'
-import SettingsPanel from './components/SettingsPanel.vue'
-import TodoDetailPanel from './components/TodoDetailPanel.vue'
-import { useTodos } from './composables/useTodos'
-import { useSettings } from './composables/useSettings'
-import { settingsDataInjectionKey } from './injectionKeys/settings'
-import type { TodoStatus, SortOptions, TodoTreeNode } from './types/todo'
+import Toolbar from '@/components/Toolbar.vue'
+import TodoList from '@/components/TodoList.vue'
+import SettingsPanel from '@/components/SettingsPanel.vue'
+import TodoDetailPanel from '@/components/TodoDetailPanel.vue'
+import { useTodos } from '@/composables/useTodos'
+import { useSettings } from '@/composables/useSettings'
+import { settingsDataInjectionKey } from '@/injectionKeys/settings'
+import type { TodoStatus, SortOptions, TodoTreeNode } from '@/types/todo'
 
 const {
   displayTodos,

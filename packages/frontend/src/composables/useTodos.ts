@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { db } from '../services/db'
+import { db } from '@/services/db'
 import type {
   Todo,
   TodoTreeNode,
@@ -8,7 +8,7 @@ import type {
   ViewMode,
   FilterOptions,
   SortOptions
-} from '../types/todo'
+} from '@/types/todo'
 
 export function useTodos() {
   const STORAGE_KEYS = {

@@ -29,8 +29,8 @@
 </template>
 
 <script setup lang="ts">
-import TSidePanel from './TSidePanel.vue'
-import { useSettings } from '../composables/useSettings'
+import TSidePanel from '@/components/TSidePanel.vue'
+import { useSettings } from '@/composables/useSettings'
 
 interface Props {
   isOpen: boolean

@@ -12,7 +12,7 @@
 
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
-import { vTooltip } from '../directives/tooltip'
+import { vTooltip } from '@/directives/tooltip'
 
 interface Props {
   icon?: Component

@@ -29,8 +29,8 @@
 </template>
 
 <script setup lang="ts">
-import TodoItem from './TodoItem.vue'
-import type { TodoTreeNode } from '../types/todo'
+import TodoItem from '@/components/TodoItem.vue'
+import type { TodoTreeNode } from '@/types/todo'
 
 interface Props {
   todos: TodoTreeNode[]

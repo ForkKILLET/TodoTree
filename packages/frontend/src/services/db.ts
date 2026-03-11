@@ -1,6 +1,6 @@
 import Dexie from 'dexie'
 import type { Table } from 'dexie'
-import type { Todo } from '../types/todo'
+import type { Todo } from '@/types/todo'
 
 export class TodoDatabase extends Dexie {
   todos!: Table<Todo, string>
