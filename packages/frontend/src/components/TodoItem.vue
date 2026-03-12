@@ -111,9 +111,10 @@ import TodoStatusSelector from '@/components/TodoStatusSelector.vue'
 import type { TodoTreeNode, TodoStatus } from '@/types/todo'
 import TButtonGroup from '@/components/TButtonGroup.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import { settingsDataInjectionKey } from '@/injectionKeys/settings'
+import { settingsDataInjectionKey } from '@/constants/inject'
 import { useTodoContentEditor } from '@/composables/useTodoContentEditor'
 import { useNow } from '@/composables/useNow'
+import { useDueColor, ONE_DAY } from '@/composables/useDueColor'
 
 interface Props {
   todo: TodoTreeNode
@@ -170,21 +171,14 @@ const autoSubmitOnBlur = computed(() => settingsData?.value.autoSubmitOnBlur ?? 
 const isLeaf = computed(() => props.todo.children.length === 0)
 
 const now = useNow()
-const ONE_DAY = 86_400_000
 const warningMs = computed(() => (settingsData?.value.dueWarningDays ?? 3) * ONE_DAY)
 
-const dueTimerColor = computed(() => {
-  const ts = props.todo.dueAt
-  if (! ts) return ''
-  const remaining = ts - now.value
-  if (remaining > warningMs.value) return 'var(--color-text-secondary)'
-  // lerp gray (128,128,128) → red (239,68,68) as remaining → 0 (or past)
-  const t = Math.max(0, Math.min(1, 1 - remaining / warningMs.value))
-  const r = Math.round(128 + 111 * t)
-  const g = Math.round(128 - 60 * t)
-  const b = Math.round(128 - 60 * t)
-  return `rgb(${r},${g},${b})`
-})
+const dueTimerColor = useDueColor(
+  toRef(() => props.todo.dueAt),
+  toRef(() => props.todo.status),
+  now,
+  warningMs,
+)
 
 const dueTimerTitle = computed(() => {
   const ts = props.todo.dueAt

@@ -60,7 +60,7 @@ import SettingsPanel from '@/components/SettingsPanel.vue'
 import TodoDetailPanel from '@/components/TodoDetailPanel.vue'
 import { useTodos } from '@/composables/useTodos'
 import { useSettings } from '@/composables/useSettings'
-import { settingsDataInjectionKey } from '@/injectionKeys/settings'
+import { settingsDataInjectionKey } from '@/constants/inject'
 import type { TodoStatus, SortOptions, TodoTreeNode } from '@/types/todo'
 
 const {

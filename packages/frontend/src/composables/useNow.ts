@@ -7,13 +7,13 @@ let timer: ReturnType<typeof setInterval> | null = null
 
 export function useNow(intervalMs = 30_000) {
   onMounted(() => {
-    refCount++
+    refCount ++
     if (refCount === 1) {
       timer = setInterval(() => { now.value = Date.now() }, intervalMs)
     }
   })
   onUnmounted(() => {
-    refCount--
+    refCount --
     if (refCount === 0 && timer !== null) {
       clearInterval(timer)
       timer = null

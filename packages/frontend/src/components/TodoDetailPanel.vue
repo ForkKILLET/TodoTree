@@ -142,8 +142,9 @@ import TButton from '@/components/TButton.vue'
 import TButtonGroup from '@/components/TButtonGroup.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useNow } from '@/composables/useNow'
+import { useDueColor, ONE_DAY } from '@/composables/useDueColor'
 import type { TodoTreeNode, TodoStatus } from '@/types/todo'
-import { settingsDataInjectionKey } from '@/injectionKeys/settings'
+import { settingsDataInjectionKey } from '@/constants/inject'
 import { useTodoContentEditor } from '@/composables/useTodoContentEditor'
 
 interface Props {
@@ -175,7 +176,7 @@ interface ActionButton {
   onClick: () => void
 }
 
-const settingsData = inject(settingsDataInjectionKey, null)
+const settingsData = inject(settingsDataInjectionKey)!
 const defaultMarkdownMode = computed(() => settingsData?.value.defaultMarkdownMode ?? false)
 
 const handleStatusChange = (status: TodoStatus) => {
@@ -384,20 +385,14 @@ const dueDateDisplay = computed(() => {
   return `${YYYY}/${M}/${D} ${HH}:${mm}`
 })
 
-const ONE_DAY = 86_400_000
-const warningMs = computed(() => (settingsData?.value.dueWarningDays ?? 3) * ONE_DAY)
+const warningMs = computed(() => settingsData.value.dueWarningDays * ONE_DAY)
 
-const dueColor = computed(() => {
-  const ts = props.todo?.dueAt
-  if (! ts) return undefined
-  const remaining = ts - now.value
-  if (remaining > warningMs.value) return 'var(--color-text-secondary)'
-  const t = Math.max(0, Math.min(1, 1 - remaining / warningMs.value))
-  const r = Math.round(128 + 111 * t)
-  const g = Math.round(128 - 60 * t)
-  const b = Math.round(128 - 60 * t)
-  return `rgb(${r},${g},${b})`
-})
+const dueColor = useDueColor(
+  toRef(() => props.todo?.dueAt),
+  toRef(() => props.todo?.status ?? 'todo'),
+  now,
+  warningMs,
+)
 
 const dueDateRelative = computed(() => {
   const ts = props.todo?.dueAt
@@ -431,7 +426,6 @@ const handleDueDateDateChange = () => {
   const ts = resolveTimestamp()
   if (ts === null) return
   emit('update', props.todo.id, { dueAt: ts })
-  // keep editor open so user can optionally adjust the time
 }
 
 const handleDueDateTimeChange = () => {

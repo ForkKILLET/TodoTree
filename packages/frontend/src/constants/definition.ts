@@ -34,5 +34,5 @@ export const SORT_FIELDS: DefinitionWithIcon<SortField>[] = [
   { value: 'createdAt', label: '创建时间', icon: CalendarPlus2 },
   { value: 'updatedAt', label: '更新时间', icon: CalendarClock },
   { value: 'status',    label: '状态',    icon: CircleCheck },
-  { value: 'dueAt',    label: '截止时间', icon: Timer },
+  { value: 'dueAt',     label: '截止时间', icon: Timer },
 ]
