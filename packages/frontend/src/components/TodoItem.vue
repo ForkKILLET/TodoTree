@@ -139,6 +139,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   (e: 'toggle-expand', id: string): void
+  (e: 'toggle-expand-subtree', id: string): void
   (e: 'expand-to-matched-descendants', id: string): void
   (e: 'update', id: string, changes: Partial<TodoTreeNode>): void
   (e: 'delete', id: string): void
@@ -267,9 +268,13 @@ const addChild = () => {
   emit('add-child', props.todo.id)
 }
 
-const handleExpandClick = () => {
+const handleExpandClick = (event: MouseEvent) => {
   if (props.todo.hasCollapsedMatchedDescendant) {
     emit('expand-to-matched-descendants', props.todo.id)
+    return
+  }
+  if (event.shiftKey) {
+    emit('toggle-expand-subtree', props.todo.id)
     return
   }
   emit('toggle-expand', props.todo.id)

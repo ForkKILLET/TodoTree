@@ -629,6 +629,36 @@ export function useTodos() {
     writeStorage(STORAGE_KEYS.expandedIds, [...expandedIds.value])
   }
 
+  // 展开/折叠整个子树
+  const toggleExpandSubtree = (id: string) => {
+    const todoMap = new Map<string, Todo>()
+    todos.value.forEach(t => todoMap.set(t.id, t))
+
+    const root = todoMap.get(id)
+    if (!root || root.children.length === 0) return
+
+    const shouldExpand = !expandedIds.value.has(id)
+
+    const ids = new Set<string>()
+    const collectSubtreeParentIds = (nodeId: string): void => {
+      const node = todoMap.get(nodeId)
+      if (!node || node.children.length === 0) return
+      ids.add(nodeId)
+      node.children.forEach(childId => collectSubtreeParentIds(childId))
+    }
+    collectSubtreeParentIds(id)
+
+    const newExpanded = new Set(expandedIds.value)
+    if (shouldExpand) {
+      ids.forEach(nodeId => newExpanded.add(nodeId))
+    }
+    else {
+      ids.forEach(nodeId => newExpanded.delete(nodeId))
+    }
+    expandedIds.value = newExpanded
+    writeStorage(STORAGE_KEYS.expandedIds, [...expandedIds.value])
+  }
+
   const expandToMatchedDescendants = (id: string) => {
     if (viewMode.value !== 'tree') return
     if (! filterOptions.value.searchText?.trim()) return
@@ -680,6 +710,7 @@ export function useTodos() {
     deleteTodo,
     reorderTodos,
     toggleExpand,
+    toggleExpandSubtree,
     expandToMatchedDescendants,
     setViewMode,
     setFilterOptions,

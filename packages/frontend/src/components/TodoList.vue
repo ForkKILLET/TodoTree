@@ -12,6 +12,7 @@
       :external-draft="editDrafts[todo.id] ?? null"
       :force-exit="forceExitTodoId === todo.id && forceExitKey > 0"
       @toggle-expand="(id) => emit('toggle-expand', id)"
+      @toggle-expand-subtree="(id) => emit('toggle-expand-subtree', id)"
       @expand-to-matched-descendants="(id) => emit('expand-to-matched-descendants', id)"
       @update="(id, changes) => emit('update', id, changes)"
       @delete="(id) => emit('delete', id)"
@@ -55,6 +56,7 @@ withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   (e: 'toggle-expand', id: string): void
+  (e: 'toggle-expand-subtree', id: string): void
   (e: 'expand-to-matched-descendants', id: string): void
   (e: 'update', id: string, changes: Partial<TodoTreeNode>): void
   (e: 'delete', id: string): void

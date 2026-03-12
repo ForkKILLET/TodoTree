@@ -25,6 +25,7 @@
       :force-exit-todo-id="listForceExitTodoId"
       :force-exit-key="listForceExitKey"
       @toggle-expand="toggleExpand"
+      @toggle-expand-subtree="toggleExpandSubtree"
       @expand-to-matched-descendants="expandToMatchedDescendants"
       @update="handleUpdate"
       @delete="deleteTodo"
@@ -76,6 +77,7 @@ const {
   deleteTodo,
   reorderTodos,
   toggleExpand,
+  toggleExpandSubtree,
   expandToMatchedDescendants,
   setViewMode,
   setFilterOptions,
