@@ -206,7 +206,6 @@ const handleImport = (data: unknown) => {
 
 const doImport = async () => {
   if (! pendingImportData.value) return
-  // structuredClone strips Vue reactive proxies so Dexie can serialize the data
   await importTodos(toRaw(pendingImportData.value))
   pendingImportData.value = null
 }

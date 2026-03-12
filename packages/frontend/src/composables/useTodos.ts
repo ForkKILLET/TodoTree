@@ -344,16 +344,14 @@ export function useTodos() {
   }
 
   // 计算节点子树内最早的截止时间
-  const computeEffectiveDueAt = (todo: Todo, todoMap: Map<string, Todo>): number | null => {
-    const values: number[] = []
-    if (todo.dueAt != null) values.push(todo.dueAt)
-    for (const childId of todo.children) {
-      const child = todoMap.get(childId)
-      if (! child) continue
-      const childEffective = computeEffectiveDueAt(child, todoMap)
-      if (childEffective != null) values.push(childEffective)
-    }
-    return values.length > 0 ? Math.min(...values) : null
+  const computeEffectiveDueAt = (todo: Todo, todoMap: Map<string, Todo>): number => {
+    return Math.min(
+      todo.dueAt ?? Infinity,
+      ...todo.children
+        .map((childId) => todoMap.get(childId))
+        .filter((child): child is Todo => !! child)
+        .map(child => computeEffectiveDueAt(child, todoMap))
+    )
   }
 
   // 构建树形结构
@@ -485,6 +483,7 @@ export function useTodos() {
       return {
         kept: {
           ...node,
+          children: keptChildren.map(c => c.id),
           childNodes: keptChildren,
           isFilterMatch: hasSearchText && isMatch,
           hasCollapsedMatchedDescendant: hasCollapsedMatchInSubtree
@@ -591,6 +590,16 @@ export function useTodos() {
     })
   }
 
+  const buildFilteredMap = (nodes: TodoTreeNode[]): Map<string, Todo> => {
+    const map = new Map<string, Todo>()
+    const collect = (node: TodoTreeNode) => {
+      map.set(node.id, node)
+      node.childNodes?.forEach(collect)
+    }
+    nodes.forEach(collect)
+    return map
+  }
+
   // 计算显示的todos
   const displayTodos = computed(() => {
     if (! todos.value.length) return []
@@ -599,14 +608,20 @@ export function useTodos() {
 
     if (viewMode.value === 'tree') {
       const tree = buildTree(todos.value)
-      const sortedTree = sortTreeNodes(tree)
 
-      // 在树上应用筛选（保留匹配节点及其祖先）
+      // 先筛选，再基于筛选结果重算 effectiveDueAt，最后排序
       const matchedIds = new Set<string>()
-      const filteredTree = filterTreeNodes(sortedTree, matchedIds)
+      const filteredTree = filterTreeNodes(tree, matchedIds)
+      const filteredMap = buildFilteredMap(filteredTree)
+      const assignEffectiveDueAt = (node: TodoTreeNode) => {
+        node.childNodes?.forEach(assignEffectiveDueAt)
+        node.effectiveDueAt = computeEffectiveDueAt(node, filteredMap)
+      }
+      filteredTree.forEach(assignEffectiveDueAt)
+      const sortedTree = sortTreeNodes(filteredTree)
 
       // 最后扁平化展示
-      nodes = flattenTree(filteredTree)
+      nodes = flattenTree(sortedTree)
       return nodes
     }
 
