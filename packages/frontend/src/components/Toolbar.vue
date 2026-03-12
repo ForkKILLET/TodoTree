@@ -78,6 +78,13 @@
         <TButton
           size="sm"
           square
+          :icon="Lightbulb"
+          tooltip="提示"
+          @click="showHintDialog = true"
+        />
+        <TButton
+          size="sm"
+          square
           :icon="Settings"
           tooltip="设置"
           @click="openSettings"
@@ -92,6 +99,8 @@
         </TButton>
       </div>
     </div>
+
+    <HintDialog v-model="showHintDialog" :hints="HINTS" />
 
     <div v-if="hasFilterStep || sortSteps.length" class="toolbar-section">
       <div v-if="hasFilterStep" class="menu-anchor">
@@ -138,7 +147,7 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, Settings, CircleCheck } from 'lucide-vue-next'
+import { Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, Settings, CircleCheck, Lightbulb } from 'lucide-vue-next'
 import { GitHubIcon } from 'vue3-simple-icons'
 import TodoStatusLabel from '@/components/TodoStatusLabel.vue'
 import TButton from '@/components/TButton.vue'
@@ -146,6 +155,8 @@ import TButtonGroup from '@/components/TButtonGroup.vue'
 import TInput from '@/components/TInput.vue'
 import type { TodoStatus, ViewMode, SortField, SortDirection, SortStep } from '@/types/todo'
 import { VIEW_MODES, SORT_FIELDS, STATUS_LIST } from '@/constants/definition'
+import { HINTS } from '@/constants/hints'
+import HintDialog from '@/components/HintDialog.vue'
 
 interface Props {
   viewMode: ViewMode
@@ -169,6 +180,7 @@ const selectedStatuses = ref<TodoStatus[]>([...props.filterStatuses])
 const sortSteps = ref<SortStep[]>(JSON.parse(JSON.stringify(props.sortSteps)))
 const hasFilterStep = ref(selectedStatuses.value.length > 0)
 const openMenuId = ref<string | null>(null)
+const showHintDialog = ref(false)
 
 const getSortFieldLabel = (field: SortField) => {
   return SORT_FIELDS.find(f => f.value === field)?.label || field
