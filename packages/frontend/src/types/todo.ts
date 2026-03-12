@@ -21,6 +21,8 @@ export interface TodoTreeNode extends Todo {
   leafStatusDistribution?: StatusDistribution
   isFilterMatch?: boolean
   hasCollapsedMatchedDescendant?: boolean
+  /** 子树中最早的截止时间（叶子节点等于自身 dueAt） */
+  effectiveDueAt?: number | null
 }
 
 export type ViewMode = 'tree' | 'flat'

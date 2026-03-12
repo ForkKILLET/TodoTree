@@ -164,14 +164,14 @@ interface ActionButton {
   active?: boolean
 }
 
-const settingsData = inject(settingsDataInjectionKey, null)
-const defaultMarkdownMode = computed(() => settingsData?.value.defaultMarkdownMode ?? false)
-const autoSubmitOnBlur = computed(() => settingsData?.value.autoSubmitOnBlur ?? true)
+const settingsData = inject(settingsDataInjectionKey)!
+const defaultMarkdownMode = computed(() => settingsData.value.defaultMarkdownMode)
+const autoSubmitOnBlur = computed(() => settingsData.value.autoSubmitOnBlur)
 
-const isLeaf = computed(() => props.todo.children.length === 0)
+const isLeaf = computed(() => ! props.todo.children.length)
 
 const now = useNow()
-const warningMs = computed(() => (settingsData?.value.dueWarningDays ?? 3) * ONE_DAY)
+const warningMs = computed(() => (settingsData.value.dueWarningDays) * ONE_DAY)
 
 const dueTimerColor = useDueColor(
   toRef(() => props.todo.dueAt),

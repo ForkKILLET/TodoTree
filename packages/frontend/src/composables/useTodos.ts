@@ -343,6 +343,19 @@ export function useTodos() {
     }
   }
 
+  // 计算节点子树内最早的截止时间
+  const computeEffectiveDueAt = (todo: Todo, todoMap: Map<string, Todo>): number | null => {
+    const values: number[] = []
+    if (todo.dueAt != null) values.push(todo.dueAt)
+    for (const childId of todo.children) {
+      const child = todoMap.get(childId)
+      if (! child) continue
+      const childEffective = computeEffectiveDueAt(child, todoMap)
+      if (childEffective != null) values.push(childEffective)
+    }
+    return values.length > 0 ? Math.min(...values) : null
+  }
+
   // 构建树形结构
   const buildTree = (items: Todo[]): TodoTreeNode[] => {
     const todoMap = new Map<string, Todo>()
@@ -358,7 +371,8 @@ export function useTodos() {
           level: 0,
           isExpanded: expandedIds.value.has(todo.id),
           status,
-          leafStatusDistribution
+          leafStatusDistribution,
+          effectiveDueAt: computeEffectiveDueAt(todo, todoMap)
         }
         rootNodes.push(node)
       }
@@ -381,7 +395,8 @@ export function useTodos() {
             level: node.level + 1,
             isExpanded: expandedIds.value.has(child.id),
             status,
-            leafStatusDistribution
+            leafStatusDistribution,
+            effectiveDueAt: computeEffectiveDueAt(child, todoMap)
           }
           return buildChildren(childNode)
         })
@@ -419,7 +434,8 @@ export function useTodos() {
         ...todo,
         level: 0,
         status,
-        leafStatusDistribution
+        leafStatusDistribution,
+        effectiveDueAt: computeEffectiveDueAt(todo, todoMap)
       }
     })
   }
@@ -539,8 +555,8 @@ export function useTodos() {
         bVal = b.status
       }
       else if (field === 'dueAt') {
-        aVal = a.dueAt ?? Infinity
-        bVal = b.dueAt ?? Infinity
+        aVal = a.effectiveDueAt ?? Infinity
+        bVal = b.effectiveDueAt ?? Infinity
       }
       else {
         aVal = a[field]
