@@ -62,6 +62,11 @@ export class TodoDatabase extends Dexie {
   async clearAllTodos(): Promise<void> {
     await this.todos.clear()
   }
+
+  async importAllTodos(items: Todo[]): Promise<void> {
+    await this.todos.clear()
+    await this.todos.bulkPut(items)
+  }
 }
 
 export const db = new TodoDatabase()

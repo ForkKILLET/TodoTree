@@ -75,13 +75,30 @@
       />
 
       <div class="toolbar-right-actions">
-        <TButton
-          size="sm"
-          square
-          :icon="Lightbulb"
-          tooltip="提示"
-          @click="showHintDialog = true"
-        />
+        <div class="menu-anchor">
+          <TButton
+            size="sm"
+            square
+            :icon="MoreHorizontal"
+            tooltip="更多"
+            @click="toggleMenuId('more')"
+          />
+          <div v-if="openMenuId === 'more'" class="menu-panel menu-panel-right">
+            <button type="button" class="menu-item" @click="openHints">
+              <Lightbulb :size="14" />
+              <span>随机提示</span>
+            </button>
+            <div class="menu-divider" />
+            <button type="button" class="menu-item" @click="handleExportClick">
+              <Download :size="14" />
+              <span>导出数据</span>
+            </button>
+            <button type="button" class="menu-item" @click="triggerImport">
+              <Upload :size="14" />
+              <span>导入数据</span>
+            </button>
+          </div>
+        </div>
         <TButton
           size="sm"
           square
@@ -98,6 +115,13 @@
         >
         </TButton>
       </div>
+      <input
+        ref="fileInputRef"
+        type="file"
+        accept=".json"
+        class="hidden-file-input"
+        @change="handleFileImport"
+      />
     </div>
 
     <HintDialog v-model="showHintDialog" :hints="HINTS" />
@@ -147,7 +171,7 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, Settings, CircleCheck, Lightbulb } from 'lucide-vue-next'
+import { Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, Settings, CircleCheck, Lightbulb, MoreHorizontal, Download, Upload } from 'lucide-vue-next'
 import { GitHubIcon } from 'vue3-simple-icons'
 import TodoStatusLabel from '@/components/TodoStatusLabel.vue'
 import TButton from '@/components/TButton.vue'
@@ -173,6 +197,8 @@ const emit = defineEmits<{
   'update:sort': [steps: SortStep[]]
   'add-root': []
   'settings-open': []
+  'export': []
+  'import': [data: unknown]
 }>()
 
 const searchText = ref(props.filterSearchText)
@@ -181,6 +207,7 @@ const sortSteps = ref<SortStep[]>(JSON.parse(JSON.stringify(props.sortSteps)))
 const hasFilterStep = ref(selectedStatuses.value.length > 0)
 const openMenuId = ref<string | null>(null)
 const showHintDialog = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
 
 const getSortFieldLabel = (field: SortField) => {
   return SORT_FIELDS.find(f => f.value === field)?.label || field
@@ -262,6 +289,38 @@ const updateSort = () => {
 
 const openSettings = () => {
   emit('settings-open')
+}
+
+const openHints = () => {
+  showHintDialog.value = true
+  openMenuId.value = null
+}
+
+const handleExportClick = () => {
+  emit('export')
+  openMenuId.value = null
+}
+
+const triggerImport = () => {
+  fileInputRef.value?.click()
+  openMenuId.value = null
+}
+
+const handleFileImport = async (event: Event) => {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (! file) return
+  try {
+    const text = await file.text()
+    const data = JSON.parse(text)
+    if (! Array.isArray(data)) throw new Error('not an array')
+    emit('import', data)
+  }
+  catch {
+    alert('导入失败：文件格式无效')
+  }
+  finally {
+    if (fileInputRef.value) fileInputRef.value.value = ''
+  }
 }
 
 const openGithub = () => {
@@ -394,5 +453,20 @@ onBeforeUnmount(() => {
 
 .step-chip-icon {
   color: var(--color-text-secondary);
+}
+
+.menu-panel-right {
+  left: auto;
+  right: 0;
+}
+
+.menu-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 3px 4px;
+}
+
+.hidden-file-input {
+  display: none;
 }
 </style>

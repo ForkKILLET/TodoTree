@@ -635,14 +635,14 @@ export function useTodos() {
     todos.value.forEach(t => todoMap.set(t.id, t))
 
     const root = todoMap.get(id)
-    if (!root || root.children.length === 0) return
+    if (! root || root.children.length === 0) return
 
-    const shouldExpand = !expandedIds.value.has(id)
+    const shouldExpand = ! expandedIds.value.has(id)
 
     const ids = new Set<string>()
     const collectSubtreeParentIds = (nodeId: string): void => {
       const node = todoMap.get(nodeId)
-      if (!node || node.children.length === 0) return
+      if (! node || node.children.length === 0) return
       ids.add(nodeId)
       node.children.forEach(childId => collectSubtreeParentIds(childId))
     }
@@ -676,6 +676,13 @@ export function useTodos() {
 
     expandedIds.value = new Set(expandedIds.value)
     writeStorage(STORAGE_KEYS.expandedIds, [...expandedIds.value])
+  }
+
+  const exportTodos = (): Todo[] => [...todos.value]
+
+  const importTodos = async (data: Todo[]): Promise<void> => {
+    await db.importAllTodos(data)
+    await loadTodos()
   }
 
   // 切换视图模式
@@ -712,6 +719,8 @@ export function useTodos() {
     toggleExpand,
     toggleExpandSubtree,
     expandToMatchedDescendants,
+    exportTodos,
+    importTodos,
     setViewMode,
     setFilterOptions,
     setSortOptions

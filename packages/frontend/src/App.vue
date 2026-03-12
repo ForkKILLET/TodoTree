@@ -10,6 +10,8 @@
       @update:sort="handleSortUpdate"
       @add-root="handleAddRoot"
       @settings-open="handleOpenSettings"
+      @export="handleExport"
+      @import="handleImport"
     />
 
     <div v-if="loading" class="loading">加载中…</div>
@@ -50,19 +52,28 @@
       @edit-change="handleEditChange"
       @edit-end="handleEditEnd"
     />
+    <ConfirmDialog
+      v-model="showImportConfirm"
+      title="确认导入"
+      :message="`确定要导入吗？将覆盖当前所有数据（共 ${pendingImportData?.length ?? 0} 条）`"
+      confirm-text="导入"
+      cancel-text="取消"
+      @confirm="doImport"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref, computed, provide } from 'vue'
+import { onMounted, onBeforeUnmount, ref, computed, provide, toRaw } from 'vue'
 import Toolbar from '@/components/Toolbar.vue'
 import TodoList from '@/components/TodoList.vue'
 import SettingsPanel from '@/components/SettingsPanel.vue'
 import TodoDetailPanel from '@/components/TodoDetailPanel.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useTodos } from '@/composables/useTodos'
 import { useSettings } from '@/composables/useSettings'
 import { settingsDataInjectionKey } from '@/constants/inject'
-import type { TodoStatus, SortOptions, TodoTreeNode } from '@/types/todo'
+import type { Todo, TodoStatus, SortOptions, TodoTreeNode } from '@/types/todo'
 
 const {
   displayTodos,
@@ -79,6 +90,8 @@ const {
   toggleExpand,
   toggleExpandSubtree,
   expandToMatchedDescendants,
+  exportTodos,
+  importTodos,
   setViewMode,
   setFilterOptions,
   setSortOptions
@@ -96,6 +109,8 @@ const detailEditingTodoId = ref<string | null>(null)
 const listForceExitTodoId = ref<string | null>(null)
 const listForceExitKey = ref(0)
 const detailForceExitKey = ref(0)
+const showImportConfirm = ref(false)
+const pendingImportData = ref<Todo[] | null>(null)
 
 const isDraggable = computed(() => sortOptions.value.length === 0 && viewMode.value === 'tree')
 const selectedTodo = computed(() => {
@@ -168,6 +183,32 @@ const handleUpdate = async (id: string, changes: Partial<TodoTreeNode>) => {
 
 const handleOpenSettings = () => {
   showSettings.value = true
+}
+
+const handleExport = () => {
+  const data = exportTodos()
+  const json = JSON.stringify(data, null, 2)
+  const blob = new Blob([json], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const date = new Date().toISOString().slice(0, 10)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `todotree-export-${date}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+const handleImport = (data: unknown) => {
+  if (! Array.isArray(data)) return
+  pendingImportData.value = data as Todo[]
+  showImportConfirm.value = true
+}
+
+const doImport = async () => {
+  if (! pendingImportData.value) return
+  // structuredClone strips Vue reactive proxies so Dexie can serialize the data
+  await importTodos(toRaw(pendingImportData.value))
+  pendingImportData.value = null
 }
 
 const handleSelectTodo = (id: string) => {
