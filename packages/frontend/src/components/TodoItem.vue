@@ -48,7 +48,8 @@
       >
         <TodoStatusSelector
           :status="todo.status"
-          :show-ring="! isLeaf"
+          :show-ring="! isLeaf || hasUserProgress"
+          :readonly="hasUserProgress"
           :distribution="todo.leafStatusDistribution"
           :dot-size="16"
           @change="setStatus"
@@ -169,7 +170,8 @@ const settingsData = inject(settingsDataInjectionKey)!
 const defaultMarkdownMode = computed(() => settingsData.value.defaultMarkdownMode)
 const autoSubmitOnBlur = computed(() => settingsData.value.autoSubmitOnBlur)
 
-const isLeaf = computed(() => ! props.todo.children.length)
+const isLeaf = computed(() => ! props.todo.hasChildrenInSource)
+const hasUserProgress = computed(() => isLeaf.value && ((props.todo.progressTotal ?? 0) > 0 || (props.todo.progressSegments?.length ?? 0) > 0))
 
 const now = useNow()
 const warningMs = computed(() => (settingsData.value.dueWarningDays) * ONE_DAY)
@@ -248,6 +250,7 @@ watch(
 )
 
 const setStatus = (status: TodoStatus) => {
+  if (hasUserProgress.value) return
   emit('update', props.todo.id, { status })
 }
 
@@ -391,7 +394,7 @@ onBeforeUnmount(() => {
 
 const defaultActionButtons = computed<ActionButton[]>(() => [
   { key: 'edit', icon: Pencil, tooltip: '编辑', onClick: () => { void startListEdit() } },
-  { key: 'add-child', icon: Plus, tooltip: '添加子项', onClick: addChild },
+  ...(! hasUserProgress.value ? [{ key: 'add-child', icon: Plus, tooltip: '添加子项', onClick: addChild }] : []),
   { key: 'delete', icon: Trash2, tooltip: '删除', onClick: remove }
 ])
 

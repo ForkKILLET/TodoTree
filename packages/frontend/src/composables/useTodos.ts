@@ -74,6 +74,14 @@ export function useTodos() {
 
   const createTodo = async (content = '', parentId: string | null = null) => {
     const now = Date.now()
+
+    if (parentId) {
+      const parent = todos.value.find(todo => todo.id === parentId) ?? await db.getTodoById(parentId)
+      if (parent && hasUserProgress(parent)) {
+        throw new Error('Todos with progress cannot have children')
+      }
+    }
+
     const newTodo: Todo = {
       id: generateId(),
       content,
@@ -84,6 +92,9 @@ export function useTodos() {
       updatedAt: now,
       order: now,
       dueAt: null,
+      progressTotal: null,
+      progressDone: null,
+      progressSegments: null,
     }
 
     try {
@@ -126,19 +137,46 @@ export function useTodos() {
 
   const updateTodo = async (id: string, changes: Partial<Todo>) => {
     try {
-      await db.updateTodo(id, changes)
-
       const index = todos.value.findIndex(todo => todo.id === id)
-      if (index !== - 1) {
-        const current = todos.value[index]
+      if (index < 0) return
+
+      const current = index !== - 1 ? todos.value[index] : null
+      const hasProgressChange = 'progressTotal' in changes || 'progressDone' in changes || 'progressSegments' in changes
+
+      const normalizedChanges: Partial<Todo> = { ...changes }
+
+      if (current && hasProgressChange) {
+        const nextProgressTotal = 'progressTotal' in normalizedChanges
+          ? normalizedChanges.progressTotal ?? null
+          : current.progressTotal ?? null
+        const nextProgressDone = 'progressDone' in normalizedChanges
+          ? normalizedChanges.progressDone ?? null
+          : current.progressDone ?? null
+        const nextProgressSegments = 'progressSegments' in normalizedChanges
+          ? normalizedChanges.progressSegments ?? null
+          : current.progressSegments ?? null
+        const normalizedProgress = normalizeProgress(nextProgressTotal, nextProgressDone, nextProgressSegments)
+
+        if (current.children.length > 0 && normalizedProgress) {
+          throw new Error('Only leaf todos can have progress')
+        }
+
+        normalizedChanges.progressTotal = normalizedProgress?.total ?? null
+        normalizedChanges.progressDone = normalizedProgress?.done ?? null
+        normalizedChanges.progressSegments = normalizedProgress?.segments ?? null
+      }
+
+      await db.updateTodo(id, normalizedChanges)
+
+      if (current) {
         todos.value[index] = {
           ...current,
-          ...changes,
+          ...normalizedChanges,
           updatedAt: Date.now()
         }
       }
 
-      if (changes.status !== undefined) {
+      if (changes.status !== undefined || hasProgressChange) {
         await updateParentStatuses(id)
       }
     }
@@ -257,28 +295,105 @@ export function useTodos() {
     }
   }
 
-  const getLeafNodes = (node: TodoTreeNode, todoMap: Map<string, Todo>): Todo[] => {
-    if (node.children.length === 0) {
-      return [node]
-    }
-
-    const leaves: Todo[] = []
-    for (const childId of node.children) {
-      const child = todoMap.get(childId)
-      if (child) {
-        const childNode: TodoTreeNode = { ...child, level: node.level + 1 }
-        leaves.push(...getLeafNodes(childNode, todoMap))
-      }
-    }
-    return leaves
-  }
-
   const createEmptyDistribution = (): StatusDistribution => ({
     todo: 0,
     doing: 0,
     done: 0,
     cancelled: 0
   })
+
+  const PROGRESS_COMPLETED_STATUSES: TodoStatus[] = ['done', 'cancelled']
+
+  const isTodoStatus = (value: unknown): value is TodoStatus => {
+    return value === 'todo' || value === 'doing' || value === 'done' || value === 'cancelled'
+  }
+
+  const normalizeProgress = (
+    progressTotal: number | null | undefined,
+    progressDone: number | null | undefined,
+    progressSegments?: Array<TodoStatus | boolean> | null,
+  ) => {
+    if (progressTotal == null && progressSegments == null) return null
+
+    const normalizedSegmentsSource = Array.isArray(progressSegments)
+      ? progressSegments.map(segment => {
+        if (isTodoStatus(segment)) return segment
+        return segment ? 'done' : 'todo'
+      })
+      : null
+
+    const total = progressTotal == null
+      ? normalizedSegmentsSource?.length ?? null
+      : Math.max(1, Math.round(progressTotal))
+
+    if (total == null) {
+      return null
+    }
+
+    let segments = normalizedSegmentsSource
+      ? [...normalizedSegmentsSource]
+      : Array.from(
+        { length: total },
+        (_, index) => index < Math.min(total, Math.max(0, Math.round(progressDone ?? 0))) ? 'done' : 'todo'
+      )
+
+    if (segments.length < total) {
+      segments = [...segments, ...Array.from({ length: total - segments.length }, () => 'todo' as const)]
+    }
+    else if (segments.length > total) {
+      segments = segments.slice(0, total)
+    }
+
+    const done = segments.filter(status => PROGRESS_COMPLETED_STATUSES.includes(status)).length
+    return { total, done, segments }
+  }
+
+  const hasUserProgress = (todo: Pick<Todo, 'children' | 'progressTotal' | 'progressDone' | 'progressSegments'>) => {
+    return todo.children.length === 0 && normalizeProgress(todo.progressTotal, todo.progressDone, todo.progressSegments) !== null
+  }
+
+  const computeLeafStatus = (todo: Todo): TodoStatus => {
+    const progress = todo.children.length === 0
+      ? normalizeProgress(todo.progressTotal, todo.progressDone, todo.progressSegments)
+      : null
+
+    if (! progress) {
+      return todo.status
+    }
+
+    return computeStatusByChildren(progress.segments)
+  }
+
+  const getLeafProgressStatuses = (todo: Todo, todoMap: Map<string, Todo>): TodoStatus[] => {
+    if (todo.children.length === 0) {
+      return [computeLeafStatus(todo)]
+    }
+
+    return todo.children
+      .map(childId => todoMap.get(childId))
+      .filter((child): child is Todo => !! child)
+      .flatMap(child => getLeafProgressStatuses(child, todoMap))
+  }
+
+  const computeProgressSummary = (todo: Todo, todoMap: Map<string, Todo>): { total: number, done: number, segments: TodoStatus[] } | null => {
+    if (todo.children.length === 0) {
+      const progress = normalizeProgress(todo.progressTotal, todo.progressDone, todo.progressSegments)
+      return progress
+        ? { total: progress.total, done: progress.done, segments: progress.segments }
+        : null
+    }
+
+    const segments = getLeafProgressStatuses(todo, todoMap)
+    if (segments.length === 0) {
+      return null
+    }
+
+    return {
+      total: segments.length,
+      done: segments.filter(status => PROGRESS_COMPLETED_STATUSES.includes(status)).length,
+      segments
+    }
+  }
 
   const computeStatusByChildren = (childStatuses: TodoStatus[]): TodoStatus => {
     if (childStatuses.every(s => s === 'cancelled')) return 'cancelled'
@@ -290,25 +405,44 @@ export function useTodos() {
   const computeStatus = (todo: Todo, todoMap: Map<string, Todo>): { status: TodoStatus, leafStatusDistribution: StatusDistribution } => {
     if (todo.children.length === 0) {
       const distribution = createEmptyDistribution()
-      distribution[todo.status] = 1
-      return { status: todo.status, leafStatusDistribution: distribution }
+      const progress = normalizeProgress(todo.progressTotal, todo.progressDone, todo.progressSegments)
+      const status = computeLeafStatus(todo)
+
+      if (progress) {
+        progress.segments.forEach(segmentStatus => {
+          distribution[segmentStatus] += 1
+        })
+      }
+      else {
+        distribution[status] = 1
+      }
+
+      return { status, leafStatusDistribution: distribution }
+    }
+    const leafStatusDistribution = createEmptyDistribution()
+    const childStatuses: TodoStatus[] = []
+
+    for (const childId of todo.children) {
+      const child = todoMap.get(childId)
+      if (! child) continue
+
+      const childResult = computeStatus(child, todoMap)
+      childStatuses.push(childResult.status)
+
+      if (child.children.length === 0) {
+        // 叶子节点（即便有进度虚拟子 todo）对父级只贡献一个状态单位，避免越级展开
+        leafStatusDistribution[childResult.status] += 1
+      }
+      else {
+        for (const status of Object.keys(leafStatusDistribution) as TodoStatus[]) {
+          leafStatusDistribution[status] += childResult.leafStatusDistribution[status]
+        }
+      }
     }
 
-    // 获取所有叶子节点
-    const node: TodoTreeNode = { ...todo, level: 0 }
-    const leafNodes = getLeafNodes(node, todoMap)
-
-    // 计算叶子状态分布
-    const leafStatusDistribution = createEmptyDistribution()
-    leafNodes.forEach(leaf => {
-      leafStatusDistribution[leaf.status] += 1
-    })
-
-    // 计算状态
-    const childStatuses = todo.children.map(childId => {
-      const child = todoMap.get(childId)!
-      return computeStatus(child, todoMap).status
-    })
+    if (childStatuses.length === 0) {
+      return { status: todo.status, leafStatusDistribution }
+    }
 
     const status = computeStatusByChildren(childStatuses)
 
@@ -320,33 +454,34 @@ export function useTodos() {
     todos.value.forEach(todo => todoMap.set(todo.id, todo))
 
     let current = todoMap.get(changedId)
-    while (current?.parentId) {
-      const parent = todoMap.get(current.parentId)
-      if (! parent) break
+    while (current) {
+      const { status: newStatus } = computeStatus(current, todoMap)
 
-      const { status: newStatus } = computeStatus(parent, todoMap)
-
-      if (newStatus !== parent.status) {
+      if (newStatus !== current.status) {
         const updatedAt = Date.now()
-        await db.updateTodo(parent.id, { status: newStatus })
+        await db.updateTodo(current.id, { status: newStatus })
 
-        const parentIndex = todos.value.findIndex(t => t.id === parent.id)
-        if (parentIndex !== - 1) {
-          todos.value[parentIndex] = { ...todos.value[parentIndex], status: newStatus, updatedAt }
+        const currentIndex = todos.value.findIndex(t => t.id === current!.id)
+        if (currentIndex !== - 1) {
+          todos.value[currentIndex] = { ...todos.value[currentIndex], status: newStatus, updatedAt }
         }
 
-        // keep todoMap up-to-date for the next iteration
-        todoMap.set(parent.id, { ...parent, status: newStatus, updatedAt })
+        todoMap.set(current.id, { ...current, status: newStatus, updatedAt })
       }
 
-      current = todoMap.get(current.parentId)
+      current = current.parentId ? todoMap.get(current.parentId) : undefined
     }
   }
 
   // 计算节点子树内最早的截止时间
+
+  const EFFECTIVE_DUE_AT_STATUS: TodoStatus[] = ['todo', 'doing']
+
   const computeEffectiveDueAt = (todo: Todo, todoMap: Map<string, Todo>): number => {
+    const status = computeStatus(todo, todoMap).status
+
     return Math.min(
-      todo.dueAt ?? Infinity,
+      (EFFECTIVE_DUE_AT_STATUS.includes(status) ? todo.dueAt : null) ?? Infinity,
       ...todo.children
         .map((childId) => todoMap.get(childId))
         .filter((child): child is Todo => !! child)
@@ -364,13 +499,18 @@ export function useTodos() {
     items.forEach(todo => {
       if (todo.parentId === null) {
         const { status, leafStatusDistribution } = computeStatus(todo, todoMap)
+        const progress = computeProgressSummary(todo, todoMap)
         const node: TodoTreeNode = {
           ...todo,
           level: 0,
+          hasChildrenInSource: todo.children.length > 0,
           isExpanded: expandedIds.value.has(todo.id),
           status,
           leafStatusDistribution,
-          effectiveDueAt: computeEffectiveDueAt(todo, todoMap)
+          effectiveDueAt: computeEffectiveDueAt(todo, todoMap),
+          computedProgressTotal: progress?.total,
+          computedProgressDone: progress?.done,
+          computedProgressSegments: progress?.segments
         }
         rootNodes.push(node)
       }
@@ -388,13 +528,18 @@ export function useTodos() {
           if (! child) return null
 
           const { status, leafStatusDistribution } = computeStatus(child, todoMap)
+          const progress = computeProgressSummary(child, todoMap)
           const childNode: TodoTreeNode = {
             ...child,
             level: node.level + 1,
+            hasChildrenInSource: child.children.length > 0,
             isExpanded: expandedIds.value.has(child.id),
             status,
             leafStatusDistribution,
-            effectiveDueAt: computeEffectiveDueAt(child, todoMap)
+            effectiveDueAt: computeEffectiveDueAt(child, todoMap),
+            computedProgressTotal: progress?.total,
+            computedProgressDone: progress?.done,
+            computedProgressSegments: progress?.segments
           }
           return buildChildren(childNode)
         })
@@ -428,12 +573,17 @@ export function useTodos() {
 
     return items.map(todo => {
       const { status, leafStatusDistribution } = computeStatus(todo, todoMap)
+      const progress = computeProgressSummary(todo, todoMap)
       return {
         ...todo,
         level: 0,
+        hasChildrenInSource: todo.children.length > 0,
         status,
         leafStatusDistribution,
-        effectiveDueAt: computeEffectiveDueAt(todo, todoMap)
+        effectiveDueAt: computeEffectiveDueAt(todo, todoMap),
+        computedProgressTotal: progress?.total,
+        computedProgressDone: progress?.done,
+        computedProgressSegments: progress?.segments
       }
     })
   }

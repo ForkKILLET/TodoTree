@@ -49,7 +49,8 @@
               :status="todo.status"
               :show-label="true"
               :dot-size="18"
-              :show-ring="! isLeaf"
+              :show-ring="! isLeaf || hasUserProgress"
+              :readonly="hasUserProgress"
               :distribution="todo.leafStatusDistribution"
               @change="handleStatusChange"
             />
@@ -118,6 +119,80 @@
             </template>
           </div>
         </div>
+        <div class="detail-attr-row">
+          <span class="attr-icon"><BarChart3 :size="16" /></span>
+          <span class="attr-label">进度</span>
+          <div class="attr-value progress-value">
+            <template v-if="isProgressCreating">
+              <span class="progress-create-prefix">0 /</span>
+              <input
+                ref="progressTotalInputEl"
+                v-model.number="progressTotalDraft"
+                type="number"
+                min="1"
+                step="1"
+                class="progress-total-input"
+                @keydown.enter.prevent="handleCreateProgress"
+                @keydown.esc="cancelCreateProgress"
+                @blur="handleCreateProgress"
+              />
+            </template>
+            <template v-else-if="progressDisplayTotal > 0">
+              <div class="progress-main">
+                <div class="progress-segments" :class="{ readonly: ! isProgressInteractive }">
+                  <TodoStatusSelector
+                    v-for="(segmentStatus, index) in progressSegmentStatuses"
+                    :key="index"
+                    class="progress-segment-selector"
+                    :status="segmentStatus"
+                    :dot-size="14"
+                    :readonly="! isProgressInteractive"
+                    @change="handleProgressSegmentChange(index, $event)"
+                  />
+                </div>
+                <button
+                  v-if="! isProgressTotalEditing"
+                  type="button"
+                  class="progress-summary progress-summary-button"
+                  :disabled="! isProgressInteractive"
+                  @click="startProgressTotalEdit"
+                >{{ progressDisplayDone }}/{{ progressDisplayTotal }} ({{ progressPercentLabel }})</button>
+                <div v-else class="progress-summary progress-summary-editing">
+                  <span>{{ progressDisplayDone }}/</span>
+                  <input
+                    ref="progressSummaryInputEl"
+                    v-model.number="progressTotalDraft"
+                    type="number"
+                    min="1"
+                    step="1"
+                    class="progress-total-input"
+                    @blur="handleProgressTotalCommit"
+                    @keydown.enter.prevent="handleProgressTotalCommit"
+                    @keydown.esc="cancelProgressTotalEdit"
+                  />
+                  <span>({{ progressPercentLabel }})</span>
+                </div>
+
+                <TButton
+                  v-if="isProgressInteractive"
+                  size="xs"
+                  square
+                  theme="ghost"
+                  :icon="X"
+                  tooltip="移除进度属性"
+                  @click="handleClearProgress"
+                />
+              </div>
+            </template>
+            <template v-else>
+              <span
+                class="progress-empty"
+                :class="{ interactive: isLeaf }"
+                @click="isLeaf && startCreateProgress()"
+              >无</span>
+            </template>
+          </div>
+        </div>
       </div>
     </div>
   </TSidePanel>
@@ -135,7 +210,7 @@
 
 <script setup lang="ts">
 import { computed, inject, toRef, ref, watch, nextTick, type Component } from 'vue'
-import { CircleCheck, CalendarPlus2, CalendarClock, Pencil, FileCode2, NotebookPen, Check, X, Timer } from 'lucide-vue-next'
+import { CircleCheck, CalendarPlus2, CalendarClock, Pencil, FileCode2, NotebookPen, Check, X, Timer, BarChart3 } from 'lucide-vue-next'
 import TSidePanel from '@/components/TSidePanel.vue'
 import TodoStatusSelector from '@/components/TodoStatusSelector.vue'
 import TButton from '@/components/TButton.vue'
@@ -180,11 +255,15 @@ const settingsData = inject(settingsDataInjectionKey)!
 const defaultMarkdownMode = computed(() => settingsData?.value.defaultMarkdownMode ?? false)
 
 const handleStatusChange = (status: TodoStatus) => {
-  if (! props.todo) return
+  if (! props.todo || hasUserProgress.value) return
   emit('update', props.todo.id, { status })
 }
 
-const isLeaf = computed(() => ! props.todo || props.todo.children.length === 0)
+const isLeaf = computed(() => ! props.todo || ! props.todo.hasChildrenInSource)
+const hasUserProgress = computed(() => {
+  if (! isLeaf.value) return false
+  return (props.todo?.progressTotal ?? 0) > 0 || (props.todo?.progressSegments?.length ?? 0) > 0
+})
 
 // 编辑缓存：存储未保存的编辑内容
 const editContentCache = ref<Record<string, string>>({})
@@ -449,6 +528,100 @@ const handleDueDateClear = () => {
   if (! props.todo) return
   emit('update', props.todo.id, { dueAt: null })
 }
+
+// ── Progress ────────────────────────────────────────────────────────────────
+const isProgressCreating = ref(false)
+const isProgressTotalEditing = ref(false)
+const progressTotalDraft = ref(1)
+const progressTotalInputEl = ref<HTMLInputElement | null>(null)
+const progressSummaryInputEl = ref<HTMLInputElement | null>(null)
+
+const progressDisplayTotal = computed(() => props.todo?.computedProgressTotal ?? 0)
+const progressDisplayDone = computed(() => props.todo?.computedProgressDone ?? 0)
+const progressSegmentStatuses = computed(() => props.todo?.computedProgressSegments ?? [])
+const progressPercentLabel = computed(() => {
+  if (progressDisplayTotal.value <= 0) return '0%'
+  return `${Math.round((progressDisplayDone.value / progressDisplayTotal.value) * 100)}%`
+})
+const isProgressInteractive = computed(() => isLeaf.value && hasUserProgress.value)
+
+watch(
+  () => [props.todo?.id, props.todo?.progressTotal, props.todo?.progressDone],
+  () => {
+    progressTotalDraft.value = Math.max(1, Math.round(props.todo?.progressTotal ?? 1))
+    isProgressCreating.value = false
+    isProgressTotalEditing.value = false
+  },
+  { immediate: true }
+)
+
+const normalizeProgressTotal = (value: number) => Math.max(1, Math.round(Number.isFinite(value) ? value : 1))
+
+const startCreateProgress = () => {
+  progressTotalDraft.value = Math.max(1, Math.round(props.todo?.progressTotal ?? 1))
+  isProgressCreating.value = true
+  isProgressTotalEditing.value = false
+  nextTick(() => progressTotalInputEl.value?.focus())
+}
+
+const cancelCreateProgress = () => {
+  isProgressCreating.value = false
+}
+
+const handleCreateProgress = () => {
+  if (! isProgressCreating.value) return
+  if (! props.todo || ! isLeaf.value) return
+  const total = normalizeProgressTotal(progressTotalDraft.value)
+  emit('update', props.todo.id, {
+    progressTotal: total,
+    progressDone: 0,
+    progressSegments: Array.from({ length: total }, () => 'todo' as const)
+  })
+  isProgressCreating.value = false
+}
+
+const handleProgressSegmentChange = (index: number, status: TodoStatus) => {
+  if (! props.todo || ! isProgressInteractive.value) return
+  const nextSegments = [...(props.todo.progressSegments ?? progressSegmentStatuses.value)]
+  nextSegments[index] = status
+  emit('update', props.todo.id, {
+    progressTotal: nextSegments.length,
+    progressDone: nextSegments.filter(segment => segment === 'done' || segment === 'cancelled').length,
+    progressSegments: nextSegments
+  })
+}
+
+const startProgressTotalEdit = () => {
+  if (! isProgressInteractive.value) return
+  progressTotalDraft.value = Math.max(1, Math.round(props.todo?.progressTotal ?? progressDisplayTotal.value ?? 1))
+  isProgressTotalEditing.value = true
+  nextTick(() => progressSummaryInputEl.value?.focus())
+}
+
+const cancelProgressTotalEdit = () => {
+  isProgressTotalEditing.value = false
+  progressTotalDraft.value = Math.max(1, Math.round(props.todo?.progressTotal ?? 1))
+}
+
+const handleProgressTotalCommit = () => {
+  if (! props.todo || ! isProgressInteractive.value) return
+  const total = normalizeProgressTotal(progressTotalDraft.value)
+  const nextSegments = [...(props.todo.progressSegments ?? progressSegmentStatuses.value)]
+  const resizedSegments = nextSegments.length < total
+    ? [...nextSegments, ...Array.from({ length: total - nextSegments.length }, () => 'todo' as const)]
+    : nextSegments.slice(0, total)
+  emit('update', props.todo.id, {
+    progressTotal: total,
+    progressDone: resizedSegments.filter(segment => segment === 'done' || segment === 'cancelled').length,
+    progressSegments: resizedSegments
+  })
+  isProgressTotalEditing.value = false
+}
+
+const handleClearProgress = () => {
+  if (! props.todo || ! isProgressInteractive.value) return
+  emit('update', props.todo.id, { progressTotal: null, progressDone: null, progressSegments: null, status: props.todo.status })
+}
 </script>
 
 <style scoped>
@@ -543,10 +716,10 @@ const handleDueDateClear = () => {
 .detail-attrs {
   display: grid;
   grid-template-columns: 16px auto 1fr;
-  grid-auto-rows: 32px;
+  grid-auto-rows: minmax(32px, auto);
   column-gap: 10px;
   row-gap: 4px;
-  align-items: center;
+  align-items: baseline;
 }
 
 .detail-attr-row {
@@ -574,6 +747,7 @@ const handleDueDateClear = () => {
   padding-left: 6px;
   font-size: var(--text-base);
   color: var(--color-text-secondary);
+  min-height: 32px;
 }
 
 .due-date-value {
@@ -637,5 +811,118 @@ const handleDueDateClear = () => {
 
 .due-date-time-input {
   width: 90px;
+}
+
+.progress-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.progress-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.progress-segments {
+  display: flex;
+  align-items: center;
+  gap: 0px;
+  flex-wrap: wrap;
+  margin-left: -2px;
+}
+
+.progress-segment-selector {
+  display: inline-flex;
+}
+
+.progress-segment.interactive {
+  cursor: pointer;
+}
+
+.progress-segment.interactive:hover {
+  border-color: var(--color-primary);
+}
+
+.progress-segment.is-done {
+  background: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.progress-segment:disabled {
+  cursor: default;
+}
+
+.progress-summary,
+.progress-empty,
+.progress-total-editor-label {
+  white-space: nowrap;
+}
+
+.progress-summary,
+.progress-empty {
+  color: var(--color-text-secondary);
+}
+
+.progress-empty {
+  opacity: 0.5;
+}
+
+.progress-summary-button {
+  border: none;
+  background: transparent;
+  padding: 2px 6px;
+  margin: 0 -6px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font: inherit;
+}
+
+.progress-summary-button:not(:disabled) {
+  cursor: pointer;
+}
+
+.progress-summary-button:not(:disabled):hover,
+.progress-empty.interactive:hover {
+  background: var(--color-bg-hover);
+}
+
+.progress-summary-button:disabled {
+  cursor: default;
+}
+
+.progress-summary-editing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.progress-empty.interactive {
+  cursor: pointer;
+  padding: 2px 6px;
+  margin: 0 -6px;
+  border-radius: var(--radius-sm);
+}
+
+.progress-create-prefix {
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.progress-total-input {
+  width: 72px;
+  font-size: var(--text-sm);
+  font-family: inherit;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  color: var(--color-text-primary);
+  outline: none;
 }
 </style>

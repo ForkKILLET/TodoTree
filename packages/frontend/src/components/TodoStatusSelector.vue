@@ -47,21 +47,23 @@ interface Props {
   dotSize?: number
   showRing?: boolean
   distribution?: StatusDistribution
+  readonly?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   showLabel: false,
   dotSize: 16,
   showRing: false,
-  distribution: () => ({ todo: 0, doing: 0, done: 0, cancelled: 0 })
+  distribution: () => ({ todo: 0, doing: 0, done: 0, cancelled: 0 }),
+  readonly: false
 })
 
 const emit = defineEmits<{
   (e: 'change', status: TodoStatus): void
 }>()
 
-// 非叶子节点（showRing）不允许交互
-const isInteractive = computed(() => ! props.showRing)
+// 非叶子节点（showRing）或只读状态不允许交互
+const isInteractive = computed(() => ! props.showRing && ! props.readonly)
 
 const currentLabel = computed(() => STATUSES[props.status].label)
 
@@ -85,7 +87,7 @@ const handleSelect = (status: TodoStatus, close: () => void) => {
   align-items: center;
   gap: 6px;
   border-radius: var(--radius-sm);
-  padding: 3px 4px;
+  padding: 3px;
   transition: background 0.15s;
 }
 

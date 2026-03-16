@@ -12,17 +12,24 @@ export interface Todo {
   updatedAt: number
   order: number
   dueAt?: number | null
+  progressTotal?: number | null
+  progressDone?: number | null
+  progressSegments?: TodoStatus[] | null
 }
 
 export interface TodoTreeNode extends Todo {
   childNodes?: TodoTreeNode[]
   level: number
+  hasChildrenInSource?: boolean
   isExpanded?: boolean
   leafStatusDistribution?: StatusDistribution
   isFilterMatch?: boolean
   hasCollapsedMatchedDescendant?: boolean
   /** 子树中最早的截止时间（叶子节点等于自身 dueAt） */
   effectiveDueAt?: number
+  computedProgressTotal?: number
+  computedProgressDone?: number
+  computedProgressSegments?: TodoStatus[]
 }
 
 export type ViewMode = 'tree' | 'flat'
