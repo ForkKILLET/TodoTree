@@ -25,7 +25,7 @@ jobs:
       - name: Build
         run: |
           pnpm i --no-frozen-lockfile
-          pnpm -F @todotree/frontend build
+          BASE_URL="/TodoTree" pnpm -F @todotree/frontend build
 
       - name: Deploy to GitHub Pages
         uses: crazy-max/ghaction-github-pages@v4

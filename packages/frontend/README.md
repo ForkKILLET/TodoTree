@@ -28,6 +28,16 @@ Preview the production build locally:
 pnpm run preview
 ```
 
+## PWA support
+
+PWA is enabled with `rsbuild-plugin-pwa`.
+
+- It generates a Service Worker during `pnpm run build`.
+- It injects SW registration script and manifest link into HTML.
+- It precaches build outputs for offline readiness.
+
+Current plugin config lives in `rsbuild.config.ts`.
+
 ## Learn more
 
 To learn more about Rsbuild, check out the following resources:
