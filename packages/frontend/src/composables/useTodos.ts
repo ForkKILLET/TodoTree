@@ -52,6 +52,10 @@ export function useTodos() {
   const normalizeFilterOptions = (options: FilterOptions): FilterOptions => {
     const normalized: FilterOptions = {}
 
+    if (options.viewAll) {
+      normalized.viewAll = true
+    }
+
     if (options.status !== undefined) {
       normalized.status = [...options.status]
     }
@@ -618,8 +622,9 @@ export function useTodos() {
   // 检查节点是否匹配筛选条件
   const nodeMatchesFilter = (node: TodoTreeNode): boolean => {
     const options = filterOptions.value
+    const isViewAll = options.viewAll === true
 
-    if (options.status?.length && ! options.status.includes(node.status)) {
+    if (! isViewAll && options.status?.length && ! options.status.includes(node.status)) {
       return false
     }
 
@@ -630,7 +635,7 @@ export function useTodos() {
       }
     }
 
-    if (options.dueDate) {
+    if (! isViewAll && options.dueDate) {
       const dueAt = node.dueAt ?? null
 
       if (options.dueDate.mode === 'has' && dueAt === null) {
@@ -896,7 +901,8 @@ export function useTodos() {
   // 设置过滤选项
   const setFilterOptions = (options: FilterOptions) => {
     filterOptions.value = normalizeFilterOptions(options)
-    writeStorage(STORAGE_KEYS.filterOptions, filterOptions.value)
+    const { viewAll: _viewAll, ...persistedFilterOptions } = filterOptions.value
+    writeStorage(STORAGE_KEYS.filterOptions, persistedFilterOptions)
   }
 
   // 设置排序选项

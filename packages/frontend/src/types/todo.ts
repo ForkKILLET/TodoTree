@@ -46,6 +46,7 @@ export interface FilterOptions {
   status?: TodoStatus[]
   searchText?: string
   dueDate?: DueDateFilter
+  viewAll?: boolean
 }
 
 export interface SortStep {

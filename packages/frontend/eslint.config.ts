@@ -27,14 +27,20 @@ export default [
     rules: {
       semi: 'off',
       'no-trailing-spaces': 'error',
+      'brace-style': ['error', 'stroustrup', { allowSingleLine: true }],
+      'space-unary-ops': ['error', { words: true, nonwords: true }],
+
       '@stylistic/semi': ['error', 'never'],
       '@stylistic/member-delimiter-style': ['error', {
         multiline: { delimiter: 'none' },
         singleline: { delimiter: 'comma' }
       }],
-      'brace-style': ['error', 'stroustrup', { allowSingleLine: true }],
-      'space-unary-ops': ['error', { words: true, nonwords: true }],
-      '@typescript-eslint/no-explicit-any': 'off'
+
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': ['error', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+      }]
     }
   },
   {

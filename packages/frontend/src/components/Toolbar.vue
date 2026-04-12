@@ -129,6 +129,16 @@
     <HintDialog v-model="showHintDialog" :hints="HINTS" />
 
     <div v-if="activeFilterSteps.length || sortSteps.length" class="toolbar-section">
+      <button
+        v-if="showViewAllStep"
+        type="button"
+        :class="['step-chip', { active: viewAllMode }]"
+        @click="toggleViewAllMode"
+      >
+        <component :is="viewAllMode ? EyeOff : Eye" :size="14" class="step-chip-icon" />
+        <span>查看全部</span>
+      </button>
+
       <div v-for="step in activeFilterSteps" :key="step.key" class="menu-anchor">
         <button type="button" class="step-chip" @click="toggleMenuId(step.menuId)">
           <component :is="step.icon" :size="14" class="step-chip-icon" />
@@ -216,7 +226,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, Settings, CircleCheck, Lightbulb, MoreHorizontal, Download, Upload, Timer, CalendarCheck2, CalendarX2, CalendarClock } from 'lucide-vue-next'
+import { Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, Settings, CircleCheck, Lightbulb, MoreHorizontal, Download, Upload, Timer, CalendarCheck2, CalendarX2, CalendarClock, Eye, EyeOff } from 'lucide-vue-next'
 import type { Component } from 'vue'
 import { GitHubIcon } from 'vue3-simple-icons'
 import TodoStatusLabel from '@/components/TodoStatusLabel.vue'
@@ -266,6 +276,7 @@ const selectedStatuses = ref<TodoStatus[]>([...(props.filterOptions.status ?? []
 const hasDueDateStep = ref(props.filterOptions.dueDate !== undefined)
 const dueDateMode = ref<DueDateFilter['mode']>(props.filterOptions.dueDate?.mode ?? 'has')
 const dueWithinDaysInput = ref(String(props.filterOptions.dueDate?.days ?? 1))
+const viewAllMode = ref(props.filterOptions.viewAll === true)
 const sortSteps = ref<SortStep[]>(JSON.parse(JSON.stringify(props.sortSteps)))
 const openMenuId = ref<string | null>(null)
 const showHintDialog = ref(false)
@@ -277,6 +288,8 @@ const activeFilterSteps = computed(() => {
     return hasDueDateStep.value
   })
 })
+
+const showViewAllStep = computed(() => activeFilterSteps.value.length > 0)
 
 const getSortFieldLabel = (field: SortField) => {
   return SORT_FIELDS.find(f => f.value === field)?.label || field
@@ -339,6 +352,11 @@ const updateSearch = () => {
   updateFilter()
 }
 
+const toggleViewAllMode = () => {
+  viewAllMode.value = ! viewAllMode.value
+  updateFilter()
+}
+
 const updateFilter = () => {
   const next: FilterOptions = {}
 
@@ -362,6 +380,10 @@ const updateFilter = () => {
     }
   }
 
+  if (viewAllMode.value && (hasStatusStep.value || hasDueDateStep.value)) {
+    next.viewAll = true
+  }
+
   emit('update:filter', next)
 }
 
@@ -379,6 +401,7 @@ watch(
     hasDueDateStep.value = value.dueDate !== undefined
     dueDateMode.value = value.dueDate?.mode ?? 'has'
     dueWithinDaysInput.value = String(value.dueDate?.days ?? 1)
+    viewAllMode.value = value.viewAll === true
   }
   ,
   { deep: true }
@@ -426,6 +449,10 @@ const removeFilterStep = (key: FilterStepKey) => {
     hasDueDateStep.value = false
     dueDateMode.value = 'has'
     dueWithinDaysInput.value = '1'
+  }
+
+  if (! hasStatusStep.value && ! hasDueDateStep.value) {
+    viewAllMode.value = false
   }
 
   updateFilter()
@@ -614,6 +641,12 @@ onBeforeUnmount(() => {
 
 .step-chip:hover {
   background: var(--color-bg-hover);
+}
+
+.step-chip.active {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-light);
 }
 
 .step-chip-icon {
