@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import { useNow } from '@/composables/useNow'
 import { db } from '@/services/db'
 import type {
   Todo,
@@ -7,10 +8,13 @@ import type {
   StatusDistribution,
   ViewMode,
   FilterOptions,
+  DueDateFilter,
   SortOptions
 } from '@/types/todo'
 
 export function useTodos() {
+  const ONE_DAY = 24 * 60 * 60 * 1000
+
   const STORAGE_KEYS = {
     expandedIds: 'todotree.expandedIds',
     viewMode: 'todotree.viewMode',
@@ -19,10 +23,8 @@ export function useTodos() {
   } as const
 
   const readStorage = <T>(key: string, fallback: T): T => {
-    if (typeof window === 'undefined') return fallback
-
     try {
-      const raw = window.localStorage.getItem(key)
+      const raw = localStorage.getItem(key)
       if (! raw) return fallback
       return JSON.parse(raw) as T
     }
@@ -32,20 +34,44 @@ export function useTodos() {
   }
 
   const writeStorage = (key: string, value: unknown) => {
-    if (typeof window === 'undefined') return
+    localStorage.setItem(key, JSON.stringify(value))
+  }
 
-    try {
-      window.localStorage.setItem(key, JSON.stringify(value))
+  const normalizeDueDateFilter = (dueDate?: DueDateFilter): DueDateFilter | undefined => {
+    if (! dueDate) return undefined
+
+    if (dueDate.mode === 'within') {
+      const parsedDays = Number(dueDate.days ?? 1)
+      const days = Number.isFinite(parsedDays) ? Math.max(1, Math.floor(parsedDays)) : 1
+      return { mode: 'within', days }
     }
-    catch {
-      // ignore storage errors
+
+    return { mode: dueDate.mode }
+  }
+
+  const normalizeFilterOptions = (options: FilterOptions): FilterOptions => {
+    const normalized: FilterOptions = {}
+
+    if (options.status !== undefined) {
+      normalized.status = [...options.status]
     }
+
+    if (options.searchText?.trim()) {
+      normalized.searchText = options.searchText
+    }
+
+    const dueDate = normalizeDueDateFilter(options.dueDate)
+    if (dueDate) {
+      normalized.dueDate = dueDate
+    }
+
+    return normalized
   }
 
   const initialExpandedIds = readStorage<string[]>(STORAGE_KEYS.expandedIds, [])
   const storedViewMode = readStorage<string>(STORAGE_KEYS.viewMode, 'tree')
   const initialViewMode: ViewMode = storedViewMode === 'flat' ? 'flat' : 'tree'
-  const initialFilterOptions = readStorage<FilterOptions>(STORAGE_KEYS.filterOptions, {})
+  const initialFilterOptions = normalizeFilterOptions(readStorage<FilterOptions>(STORAGE_KEYS.filterOptions, {}))
   const initialSortOptions = readStorage<SortOptions>(STORAGE_KEYS.sortOptions, [])
 
   const todos = ref<Todo[]>([])
@@ -54,6 +80,7 @@ export function useTodos() {
   const sortOptions = ref<SortOptions>(initialSortOptions)
   const loading = ref(false)
   const expandedIds = ref<Set<string>>(new Set(initialExpandedIds))
+  const now = useNow(60_000)
 
   const loadTodos = async () => {
     loading.value = true
@@ -590,16 +617,41 @@ export function useTodos() {
 
   // 检查节点是否匹配筛选条件
   const nodeMatchesFilter = (node: TodoTreeNode): boolean => {
-    if (filterOptions.value.status && filterOptions.value.status.length) {
-      if (! filterOptions.value.status.includes(node.status)) {
+    const options = filterOptions.value
+
+    if (options.status?.length && ! options.status.includes(node.status)) {
+      return false
+    }
+
+    if (options.searchText?.trim()) {
+      const searchLower = options.searchText.toLowerCase()
+      if (! node.content.toLowerCase().includes(searchLower)) {
         return false
       }
     }
 
-    if (filterOptions.value.searchText) {
-      const searchLower = filterOptions.value.searchText.toLowerCase()
-      if (! node.content.toLowerCase().includes(searchLower)) {
+    if (options.dueDate) {
+      const dueAt = node.dueAt ?? null
+
+      if (options.dueDate.mode === 'has' && dueAt === null) {
         return false
+      }
+
+      if (options.dueDate.mode === 'none' && dueAt !== null) {
+        return false
+      }
+
+      if (options.dueDate.mode === 'within') {
+        if (dueAt === null) {
+          return false
+        }
+
+        const parsedDays = Number(options.dueDate.days ?? 1)
+        const days = Number.isFinite(parsedDays) ? Math.max(1, Math.floor(parsedDays)) : 1
+        const upperBound = now.value + (days * ONE_DAY)
+        if (dueAt < now.value || dueAt > upperBound) {
+          return false
+        }
       }
     }
 
@@ -669,22 +721,7 @@ export function useTodos() {
 
   // 扁平列表过滤（仅用于扁平视图）
   const applyFilter = (items: TodoTreeNode[]): TodoTreeNode[] => {
-    let filtered = items
-
-    if (filterOptions.value.status && filterOptions.value.status.length) {
-      filtered = filtered.filter(item =>
-        filterOptions.value.status!.includes(item.status)
-      )
-    }
-
-    if (filterOptions.value.searchText) {
-      const searchLower = filterOptions.value.searchText.toLowerCase()
-      filtered = filtered.filter(item =>
-        item.content.toLowerCase().includes(searchLower)
-      )
-    }
-
-    return filtered
+    return items.filter(item => nodeMatchesFilter(item))
   }
 
   // 排序比较器（级联多步骤排序）
@@ -858,8 +895,8 @@ export function useTodos() {
 
   // 设置过滤选项
   const setFilterOptions = (options: FilterOptions) => {
-    filterOptions.value = options
-    writeStorage(STORAGE_KEYS.filterOptions, options)
+    filterOptions.value = normalizeFilterOptions(options)
+    writeStorage(STORAGE_KEYS.filterOptions, filterOptions.value)
   }
 
   // 设置排序选项

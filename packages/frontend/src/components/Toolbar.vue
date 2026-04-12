@@ -33,12 +33,14 @@
         />
         <div v-if="openMenuId === 'filter-main'" class="menu-panel">
           <button
+            v-for="step in FILTER_STEPS"
+            :key="step.key"
             type="button"
             class="menu-item"
-            @click="openFilterStatusStep"
+            @click="openFilterStep(step.key)"
           >
-            <CircleCheck :size="14" />
-            <span>状态</span>
+            <component :is="step.icon" :size="14" />
+            <span>{{ step.label }}</span>
           </button>
         </div>
       </div>
@@ -126,23 +128,66 @@
 
     <HintDialog v-model="showHintDialog" :hints="HINTS" />
 
-    <div v-if="hasFilterStep || sortSteps.length" class="toolbar-section">
-      <div v-if="hasFilterStep" class="menu-anchor">
-        <button type="button" class="step-chip" @click="toggleMenuId('filter-step')">
-          <Funnel :size="14" class="step-chip-icon" />
-          <span>状态</span>
+    <div v-if="activeFilterSteps.length || sortSteps.length" class="toolbar-section">
+      <div v-for="step in activeFilterSteps" :key="step.key" class="menu-anchor">
+        <button type="button" class="step-chip" @click="toggleMenuId(step.menuId)">
+          <component :is="step.icon" :size="14" class="step-chip-icon" />
+          <span>{{ step.label }}</span>
         </button>
-        <div v-if="openMenuId === 'filter-step'" class="menu-panel">
-          <button
-            v-for="status in STATUS_LIST"
-            :key="`step-${status.value}`"
-            type="button"
-            :class="['menu-item', { active: selectedStatuses.includes(status.value) }]"
-            @click="toggleStatus(status.value)"
-          >
-            <TodoStatusLabel :status="status.value" :dot-size="14" />
-          </button>
-          <button type="button" class="menu-item danger" @click="removeFilterStep">
+        <div v-if="openMenuId === step.menuId" class="menu-panel">
+          <template v-if="step.key === 'status'">
+            <button
+              v-for="status in STATUS_LIST"
+              :key="`step-status-${status.value}`"
+              type="button"
+              :class="['menu-item', { active: selectedStatuses.includes(status.value) }]"
+              @click="toggleStatus(status.value)"
+            >
+              <TodoStatusLabel :status="status.value" :dot-size="14" />
+            </button>
+          </template>
+
+          <template v-else>
+            <button
+              type="button"
+              :class="['menu-item', { active: dueDateMode === 'has' }]"
+              @click="setDueDateMode('has')"
+            >
+              <CalendarCheck2 :size="14" />
+              <span>有截止时间</span>
+            </button>
+            <button
+              type="button"
+              :class="['menu-item', { active: dueDateMode === 'none' }]"
+              @click="setDueDateMode('none')"
+            >
+              <CalendarX2 :size="14" />
+              <span>无截止时间</span>
+            </button>
+            <button
+              type="button"
+              :class="['menu-item', { active: dueDateMode === 'within' }]"
+              @click="setDueDateMode('within')"
+            >
+              <CalendarClock :size="14" />
+              <span>n 天内</span>
+            </button>
+            <div v-if="dueDateMode === 'within'" class="due-input-row">
+              <TInput
+                v-model="dueWithinDaysInput"
+                size="sm"
+                type="number"
+                min="1"
+                step="1"
+                class="due-input"
+                placeholder="天数"
+                @update:modelValue="updateDueWithinDays"
+              />
+              <span class="due-input-suffix">天内</span>
+            </div>
+          </template>
+
+          <button type="button" class="menu-item danger" @click="removeFilterStep(step.key)">
             <Trash2 :size="14" />
             删除筛选步骤
           </button>
@@ -170,22 +215,36 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, Settings, CircleCheck, Lightbulb, MoreHorizontal, Download, Upload } from 'lucide-vue-next'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, Settings, CircleCheck, Lightbulb, MoreHorizontal, Download, Upload, Timer, CalendarCheck2, CalendarX2, CalendarClock } from 'lucide-vue-next'
+import type { Component } from 'vue'
 import { GitHubIcon } from 'vue3-simple-icons'
 import TodoStatusLabel from '@/components/TodoStatusLabel.vue'
 import TButton from '@/components/TButton.vue'
 import TButtonGroup from '@/components/TButtonGroup.vue'
 import TInput from '@/components/TInput.vue'
-import type { TodoStatus, ViewMode, SortField, SortDirection, SortStep } from '@/types/todo'
+import type { TodoStatus, ViewMode, SortField, SortDirection, SortStep, FilterOptions, DueDateFilter } from '@/types/todo'
 import { VIEW_MODES, SORT_FIELDS, STATUS_LIST } from '@/constants/definition'
 import { HINTS } from '@/constants/hints'
 import HintDialog from '@/components/HintDialog.vue'
 
+type FilterStepKey = 'status' | 'dueDate'
+
+interface FilterStepDefinition {
+  key: FilterStepKey
+  label: string
+  icon: Component
+  menuId: string
+}
+
+const FILTER_STEPS: FilterStepDefinition[] = [
+  { key: 'status', label: '状态', icon: CircleCheck, menuId: 'filter-step-status' },
+  { key: 'dueDate', label: '截止时间', icon: Timer, menuId: 'filter-step-due-date' }
+]
+
 interface Props {
   viewMode: ViewMode
-  filterStatuses: TodoStatus[]
-  filterSearchText: string
+  filterOptions: FilterOptions
   sortSteps: SortStep[]
 }
 
@@ -193,7 +252,7 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
   'update:viewMode': [mode: ViewMode]
-  'update:filter': [statuses: TodoStatus[], searchText: string]
+  'update:filter': [options: FilterOptions]
   'update:sort': [steps: SortStep[]]
   'add-root': []
   'settings-open': []
@@ -201,13 +260,23 @@ const emit = defineEmits<{
   'import': [data: unknown]
 }>()
 
-const searchText = ref(props.filterSearchText)
-const selectedStatuses = ref<TodoStatus[]>([...props.filterStatuses])
+const searchText = ref(props.filterOptions.searchText ?? '')
+const hasStatusStep = ref(props.filterOptions.status !== undefined)
+const selectedStatuses = ref<TodoStatus[]>([...(props.filterOptions.status ?? [])])
+const hasDueDateStep = ref(props.filterOptions.dueDate !== undefined)
+const dueDateMode = ref<DueDateFilter['mode']>(props.filterOptions.dueDate?.mode ?? 'has')
+const dueWithinDaysInput = ref(String(props.filterOptions.dueDate?.days ?? 1))
 const sortSteps = ref<SortStep[]>(JSON.parse(JSON.stringify(props.sortSteps)))
-const hasFilterStep = ref(selectedStatuses.value.length > 0)
 const openMenuId = ref<string | null>(null)
 const showHintDialog = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+
+const activeFilterSteps = computed(() => {
+  return FILTER_STEPS.filter(step => {
+    if (step.key === 'status') return hasStatusStep.value
+    return hasDueDateStep.value
+  })
+})
 
 const getSortFieldLabel = (field: SortField) => {
   return SORT_FIELDS.find(f => f.value === field)?.label || field
@@ -217,9 +286,20 @@ const toggleMenuId = (id: string) => {
   openMenuId.value = openMenuId.value === id ? null : id
 }
 
-const openFilterStatusStep = () => {
-  hasFilterStep.value = true
-  openMenuId.value = 'filter-step'
+const openFilterStep = (key: FilterStepKey) => {
+  if (key === 'status') {
+    hasStatusStep.value = true
+    openMenuId.value = 'filter-step-status'
+    updateFilter()
+    return
+  }
+
+  hasDueDateStep.value = true
+  if (! dueDateMode.value) {
+    dueDateMode.value = 'has'
+  }
+  openMenuId.value = 'filter-step-due-date'
+  updateFilter()
 }
 
 const toggleStatus = (status: TodoStatus) => {
@@ -230,8 +310,29 @@ const toggleStatus = (status: TodoStatus) => {
   else {
     selectedStatuses.value.push(status)
   }
-  hasFilterStep.value = selectedStatuses.value.length > 0
   updateFilter()
+}
+
+const normalizeDueDays = (input: string) => {
+  const parsed = Number(input)
+  if (! Number.isFinite(parsed)) return 1
+  return Math.max(1, Math.floor(parsed))
+}
+
+const setDueDateMode = (mode: DueDateFilter['mode']) => {
+  dueDateMode.value = mode
+  if (mode === 'within') {
+    const normalized = normalizeDueDays(dueWithinDaysInput.value)
+    dueWithinDaysInput.value = String(normalized)
+  }
+  updateFilter()
+}
+
+const updateDueWithinDays = (value: string | undefined) => {
+  dueWithinDaysInput.value = value ?? ''
+  if (dueDateMode.value === 'within') {
+    updateFilter()
+  }
 }
 
 const updateSearch = () => {
@@ -239,16 +340,56 @@ const updateSearch = () => {
 }
 
 const updateFilter = () => {
-  emit('update:filter', selectedStatuses.value, searchText.value)
+  const next: FilterOptions = {}
+
+  if (hasStatusStep.value) {
+    next.status = [...selectedStatuses.value]
+  }
+
+  if (searchText.value.trim()) {
+    next.searchText = searchText.value
+  }
+
+  if (hasDueDateStep.value) {
+    if (dueDateMode.value === 'within') {
+      next.dueDate = {
+        mode: 'within',
+        days: normalizeDueDays(dueWithinDaysInput.value)
+      }
+    }
+    else {
+      next.dueDate = { mode: dueDateMode.value }
+    }
+  }
+
+  emit('update:filter', next)
 }
 
 watch(
-  () => props.filterSearchText,
+  () => props.filterOptions,
   value => {
-    if (value !== searchText.value) {
-      searchText.value = value
+    const nextSearch = value.searchText ?? ''
+    if (nextSearch !== searchText.value) {
+      searchText.value = nextSearch
     }
+
+    hasStatusStep.value = value.status !== undefined
+    selectedStatuses.value = [...(value.status ?? [])]
+
+    hasDueDateStep.value = value.dueDate !== undefined
+    dueDateMode.value = value.dueDate?.mode ?? 'has'
+    dueWithinDaysInput.value = String(value.dueDate?.days ?? 1)
   }
+  ,
+  { deep: true }
+)
+
+watch(
+  () => props.sortSteps,
+  value => {
+    sortSteps.value = JSON.parse(JSON.stringify(value))
+  },
+  { deep: true }
 )
 
 const addSortStep = (field: SortField) => {
@@ -276,9 +417,17 @@ const removeSortStep = (index: number) => {
   updateSort()
 }
 
-const removeFilterStep = () => {
-  selectedStatuses.value = []
-  hasFilterStep.value = false
+const removeFilterStep = (key: FilterStepKey) => {
+  if (key === 'status') {
+    selectedStatuses.value = []
+    hasStatusStep.value = false
+  }
+  else {
+    hasDueDateStep.value = false
+    dueDateMode.value = 'has'
+    dueWithinDaysInput.value = '1'
+  }
+
   updateFilter()
   openMenuId.value = null
 }
@@ -428,6 +577,22 @@ onBeforeUnmount(() => {
 .menu-item.active {
   background: var(--color-primary-light);
   color: var(--color-primary);
+}
+
+.due-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+}
+
+.due-input {
+  width: 64px;
+}
+
+.due-input-suffix {
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
 }
 
 .menu-item.danger {

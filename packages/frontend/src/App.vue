@@ -2,8 +2,7 @@
   <div class="app">
     <Toolbar
       :view-mode="viewMode"
-      :filter-statuses="filterOptions.status || []"
-      :filter-search-text="filterOptions.searchText || ''"
+      :filter-options="filterOptions"
       :sort-steps="sortOptions"
       @update:view-mode="setViewMode"
       @update:filter="handleFilterUpdate"
@@ -73,7 +72,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useTodos } from '@/composables/useTodos'
 import { useSettings } from '@/composables/useSettings'
 import { settingsDataInjectionKey } from '@/constants/inject'
-import type { Todo, TodoStatus, SortOptions, TodoTreeNode } from '@/types/todo'
+import type { Todo, FilterOptions, SortOptions, TodoTreeNode } from '@/types/todo'
 
 const {
   displayTodos,
@@ -153,8 +152,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
 })
 
-const handleFilterUpdate = (statuses: TodoStatus[], searchText: string) => {
-  setFilterOptions({ status: statuses.length ? statuses : undefined, searchText: searchText || undefined })
+const handleFilterUpdate = (options: FilterOptions) => {
+  setFilterOptions(options)
 }
 
 const handleSortUpdate = (sortSteps: SortOptions) => {

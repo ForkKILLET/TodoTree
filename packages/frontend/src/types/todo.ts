@@ -37,9 +37,15 @@ export type ViewMode = 'tree' | 'flat'
 export type SortField = 'createdAt' | 'updatedAt' | 'status' | 'dueAt'
 export type SortDirection = 'asc' | 'desc'
 
+export interface DueDateFilter {
+  mode: 'has' | 'none' | 'within'
+  days?: number
+}
+
 export interface FilterOptions {
   status?: TodoStatus[]
   searchText?: string
+  dueDate?: DueDateFilter
 }
 
 export interface SortStep {
