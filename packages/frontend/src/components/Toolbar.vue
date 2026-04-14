@@ -108,14 +108,14 @@
           tooltip="设置"
           @click="openSettings"
         />
-        <TButton
-          size="sm"
-          square
-          :icon="GitHubIcon"
-          tooltip="GitHub"
-          @click="openGithub"
-        >
-        </TButton>
+        <a href="https://github.com/ForkKILLET/TodoTree" target="_blank">
+          <TButton
+            size="sm"
+            square
+            :icon="GitHubIcon"
+            tooltip="GitHub"
+          />
+        </a>
       </div>
       <input
         ref="fileInputRef"
@@ -497,10 +497,6 @@ const handleFileImport = async (event: Event) => {
   finally {
     if (fileInputRef.value) fileInputRef.value.value = ''
   }
-}
-
-const openGithub = () => {
-  window.open('https://github.com/ForkKILLET/TodoTree', '_blank')
 }
 
 const handleOutsideClick = (event: MouseEvent) => {

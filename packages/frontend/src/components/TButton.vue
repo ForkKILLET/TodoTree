@@ -133,4 +133,8 @@ const iconSize = computed(() => ICON_SIZE_MAP[props.size])
 .t-button.ghost.active {
   background: var(--color-bg-hover);
 }
+
+.t-button :deep(svg) {
+  pointer-events: none; /* Prevent <title> in SVG from showing a tooltip */
+}
 </style>
