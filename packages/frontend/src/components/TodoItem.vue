@@ -7,6 +7,8 @@
       'drag-over-after': dragPosition === 'after'
     }"
     :style="{ '--indent-offset': `${level * 30}px` }"
+    :data-todo-id="todo.id"
+    :data-todo-level="level"
     :draggable="isDraggable"
     @dragstart="handleDragStart"
     @dragover.prevent="handleDragOver"

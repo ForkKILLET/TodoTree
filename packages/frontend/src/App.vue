@@ -74,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref, computed, provide, toRaw, watch } from 'vue'
+import { onMounted, onBeforeUnmount, ref, computed, provide, toRaw, watch, nextTick } from 'vue'
 import Toolbar from '@/components/Toolbar.vue'
 import TodoList from '@/components/TodoList.vue'
 import SettingsPanel from '@/components/SettingsPanel.vue'
@@ -164,6 +164,50 @@ const unsavedTodoCount = computed(() => {
     }, 0)
 })
 
+const TOP_LEVEL_TODO_SELECTOR = '.todo-item[data-todo-level="0"][data-todo-id]'
+let filterScrollSyncToken = 0
+
+interface ViewportScrollAnchor {
+  todoId: string
+  top: number
+}
+
+const captureTopVisibleRootTodoAnchor = (): ViewportScrollAnchor | null => {
+  const topLevelTodoElements = Array.from(document.querySelectorAll<HTMLElement>(TOP_LEVEL_TODO_SELECTOR))
+  if (topLevelTodoElements.length === 0) return null
+
+  const viewportHeight = window.innerHeight
+  const visibleTopLevelTodoElements = topLevelTodoElements.filter(element => {
+    const rect = element.getBoundingClientRect()
+    return rect.bottom > 0 && rect.top < viewportHeight
+  })
+
+  if (visibleTopLevelTodoElements.length === 0) return null
+
+  const topVisibleElement = visibleTopLevelTodoElements.reduce((candidate, element) => {
+    return element.getBoundingClientRect().top < candidate.getBoundingClientRect().top ? element : candidate
+  })
+
+  const todoId = topVisibleElement.dataset.todoId
+  if (! todoId) return null
+
+  return {
+    todoId,
+    top: topVisibleElement.getBoundingClientRect().top
+  }
+}
+
+const restoreRootTodoAnchorPosition = (anchor: ViewportScrollAnchor) => {
+  const escapedTodoId = anchor.todoId.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  const target = document.querySelector<HTMLElement>(`${TOP_LEVEL_TODO_SELECTOR}[data-todo-id="${escapedTodoId}"]`)
+  if (! target) return
+
+  const offset = target.getBoundingClientRect().top - anchor.top
+  if (Math.abs(offset) < 0.5) return
+
+  window.scrollBy({ top: offset, behavior: 'auto' })
+}
+
 const handleBeforeUnload = (event: BeforeUnloadEvent) => {
   if (settingsData.value.autoSubmitOnBlur ?? true) return
   if (unsavedTodoCount.value === 0) return
@@ -192,8 +236,18 @@ watch(
   { immediate: true }
 )
 
-const handleFilterUpdate = (options: FilterOptions) => {
+const handleFilterUpdate = async (options: FilterOptions) => {
+  const anchor = captureTopVisibleRootTodoAnchor()
+  filterScrollSyncToken += 1
+  const token = filterScrollSyncToken
+
   setFilterOptions(options)
+
+  if (! anchor) return
+  await nextTick()
+
+  if (token !== filterScrollSyncToken) return
+  restoreRootTodoAnchorPosition(anchor)
 }
 
 const handleSortUpdate = (sortSteps: SortOptions) => {
