@@ -6,7 +6,7 @@
           v-if="! isEditing"
           class="detail-title markdown"
           v-html="renderedContent || '（空内容）'"
-          @dblclick="startDetailEdit"
+          @dblclick.prevent="startDetailEdit"
         ></div>
         <template v-else>
           <div

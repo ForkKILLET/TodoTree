@@ -14,82 +14,84 @@
     @drop.prevent="handleDrop"
     @dragend="handleDragEnd"
   >
-    <TButtonGroup class="todo-item-actions" size="sm" :class="{ 'is-visible': isEditing }">
-      <TButton
-        v-for="button in currentActionButtons"
-        :key="button.key"
-        class="action-btn"
-        square
-        :icon="button.icon"
-        :active="button.active"
-        :tooltip="button.tooltip"
-        @click="button.onClick"
-      />
-    </TButtonGroup>
-
-    <div class="todo-item-wrapper">
-      <TButton
-        v-if="isTree && todo.children.length"
-        :class="['expand-btn', { 'expand-to-match': todo.hasCollapsedMatchedDescendant }]"
-        size="sm"
-        theme="ghost"
-        square
-        :icon="todo.hasCollapsedMatchedDescendant ? ChevronsRight : (todo.isExpanded ? ChevronDown : ChevronRight)"
-        :tooltip="todo.hasCollapsedMatchedDescendant ? '展开到匹配子项' : (todo.isExpanded ? '收起' : '展开')"
-        @click="handleExpandClick"
-      />
-      <div v-else-if="isTree" class="expand-placeholder"></div>
-
-      <div
-        class="todo-item-content"
-        :class="{ 'detail-active': isDetailActive }"
-        data-editor-root
-        @click="handleSelect"
-      >
-        <TodoStatusSelector
-          :status="todo.status"
-          :show-ring="! isLeaf || hasUserProgress"
-          :readonly="hasUserProgress"
-          :distribution="todo.leafStatusDistribution"
-          :dot-size="16"
-          @change="setStatus"
+    <div class="todo-item-inner">
+      <div class="todo-item-wrapper">
+        <TButton
+          v-if="isTree && todo.children.length"
+          :class="['expand-btn', { 'expand-to-match': todo.hasCollapsedMatchedDescendant }]"
+          size="sm"
+          theme="ghost"
+          square
+          :icon="todo.hasCollapsedMatchedDescendant ? ChevronsRight : (todo.isExpanded ? ChevronDown : ChevronRight)"
+          :tooltip="todo.hasCollapsedMatchedDescendant ? '展开到匹配子项' : (todo.isExpanded ? '收起' : '展开')"
+          @click="handleExpandClick"
         />
+        <div v-else-if="isTree" class="expand-placeholder"></div>
 
         <div
-          v-if="! isEditing"
-          class="markdown"
-          v-html="renderedContent"
-          @dblclick="startListEdit"
-        ></div>
-        <template v-else>
-          <div
-            v-if="editMode === 'wysiwyg'"
-            :ref="setEditInputRef"
-            class="markdown edit-contenteditable"
-            contenteditable="true"
-            @input="handleEditInput"
-            @blur="handleEditorBlur"
-            @keydown.ctrl.enter.prevent="saveAndExitEdit"
-          ></div>
-          <textarea
-            v-else
-            :ref="setMarkdownInputRef"
-            v-model="editContent"
-            class="edit-markdown"
-            @blur="handleEditorBlur"
-            @keydown.ctrl.enter.prevent="saveAndExitEdit"
-          />
-        </template>
-
-        <span
-          v-if="todo.dueAt"
-          class="due-clock"
-          :style="{ color: dueTimerColor }"
-          :title="dueTimerTitle"
+          class="todo-item-content"
+          :class="{ 'detail-active': isDetailActive }"
+          data-editor-root
+          @click="handleSelect"
         >
-          <Timer :size="13" />
-        </span>
+          <TodoStatusSelector
+            :status="todo.status"
+            :show-ring="! isLeaf || hasUserProgress"
+            :readonly="hasUserProgress"
+            :distribution="todo.leafStatusDistribution"
+            :dot-size="16"
+            @change="setStatus"
+          />
+
+          <div
+            v-if="! isEditing"
+            class="markdown"
+            v-html="renderedContent"
+            @dblclick.prevent="startListEdit"
+          ></div>
+          <template v-else>
+            <div
+              v-if="editMode === 'wysiwyg'"
+              :ref="setEditInputRef"
+              class="markdown edit-contenteditable"
+              contenteditable="true"
+              @input="handleEditInput"
+              @blur="handleEditorBlur"
+              @keydown.ctrl.enter.prevent="saveAndExitEdit"
+            ></div>
+            <textarea
+              v-else
+              :ref="setMarkdownInputRef"
+              v-model="editContent"
+              class="edit-markdown"
+              @blur="handleEditorBlur"
+              @keydown.ctrl.enter.prevent="saveAndExitEdit"
+            />
+          </template>
+
+          <span
+            v-if="todo.dueAt"
+            class="due-clock"
+            :style="{ color: dueTimerColor }"
+            :title="dueTimerTitle"
+          >
+            <Timer :size="13" />
+          </span>
+        </div>
       </div>
+
+      <TButtonGroup class="todo-item-actions" size="sm" :class="{ 'is-visible': isEditing }">
+        <TButton
+          v-for="button in currentActionButtons"
+          :key="button.key"
+          class="action-btn"
+          square
+          :icon="button.icon"
+          :active="button.active"
+          :tooltip="button.tooltip"
+          @click="button.onClick"
+        />
+      </TButtonGroup>
     </div>
   </div>
 
@@ -427,9 +429,14 @@ watch(
 <style scoped>
 .todo-item {
   position: relative;
-  gap: 4px;
   margin: 4px 0;
   width: fit-content;
+}
+
+.todo-item-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .todo-item[draggable="true"] {
@@ -456,12 +463,8 @@ watch(
 }
 
 .todo-item-actions {
-  position: absolute;
-  right: 8px;
-  top: 8px;
   opacity: 0;
   transition: opacity 0.2s;
-  z-index: 1;
 }
 
 .todo-item:hover .todo-item-actions {
