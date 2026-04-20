@@ -1,0 +1,26 @@
+{
+  "short_name": "TodoTree",
+  "id": "./",
+  "orientation": "landscape-primary",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#2f6fed",
+  "icons": [
+    {
+      "src": "./app-icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./favicon.ico",
+      "type": "image/x-icon",
+      "sizes": "32x32 48x48 64x64 128x128 256x256",
+      "purpose": "any"
+    }
+  ],
+  "name": "TodoTree",
+  "scope": "./",
+  "start_url": "./",
+  "description": "Manage your todos as trees."
+}
