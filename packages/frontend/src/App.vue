@@ -70,6 +70,15 @@
       @cancel="clearPendingDuplicateTodoUpdate"
       @tertiary="handleDuplicateTodoJump"
     />
+    <ConfirmDialog
+      v-model="showWaitingRefreshConfirm"
+      title="发现新版本"
+      message="TodoTree 有新版本可用，是否刷新页面以更新？"
+      confirm-text="立即刷新"
+      cancel-text="稍后"
+      @confirm="handleWaitingRefreshConfirm"
+      @cancel="handleWaitingRefreshCancel"
+    />
   </div>
 </template>
 
@@ -84,6 +93,7 @@ import { useTodos } from '@/composables/useTodos'
 import { useSettings } from '@/composables/useSettings'
 import { settingsDataInjectionKey } from '@/constants/inject'
 import type { Todo, FilterOptions, SortOptions, TodoTreeNode } from '@/types/todo'
+import type { PwaWaitingRefreshEvent } from '@/types/pwa'
 
 const {
   todos,
@@ -124,6 +134,8 @@ const detailForceExitKey = ref(0)
 const showImportConfirm = ref(false)
 const pendingImportData = ref<Todo[] | null>(null)
 const showDuplicateTodoConfirm = ref(false)
+const showWaitingRefreshConfirm = ref(false)
+const waitingRefreshWorker = ref<ServiceWorker | null>(null)
 const pendingDuplicateTodoUpdate = ref<{
   todoId: string
   content: string
@@ -148,8 +160,7 @@ const duplicateTodoMessage = computed(() => {
   const pending = pendingDuplicateTodoUpdate.value
   if (! pending) return '有重复的 Todo 项。'
 
-  const duplicateCount = pending.duplicateIds.length
-  return `有重复的 Todo 项（同级已存在 ${duplicateCount} 条相同内容）。是否继续保存？`
+  return '有重复的 Todo 项。是否继续保存？'
 })
 const unsavedTodoCount = computed(() => {
   const todosMap = new Map(displayTodos.value.map(todo => [todo.id, todo.content]))
@@ -179,7 +190,7 @@ const captureTopVisibleRootTodoAnchor = (): ViewportScrollAnchor | null => {
   const viewportHeight = window.innerHeight
   const visibleTopLevelTodoElements = topLevelTodoElements.filter(element => {
     const rect = element.getBoundingClientRect()
-    return rect.bottom > 0 && rect.top < viewportHeight
+    return rect.top > 0 && rect.bottom < viewportHeight
   })
 
   if (visibleTopLevelTodoElements.length === 0) return null
@@ -198,8 +209,7 @@ const captureTopVisibleRootTodoAnchor = (): ViewportScrollAnchor | null => {
 }
 
 const restoreRootTodoAnchorPosition = (anchor: ViewportScrollAnchor) => {
-  const escapedTodoId = anchor.todoId.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-  const target = document.querySelector<HTMLElement>(`${TOP_LEVEL_TODO_SELECTOR}[data-todo-id="${escapedTodoId}"]`)
+  const target = document.querySelector<HTMLElement>(`${TOP_LEVEL_TODO_SELECTOR}[data-todo-id="${anchor.todoId}"]`)
   if (! target) return
 
   const offset = target.getBoundingClientRect().top - anchor.top
@@ -215,8 +225,28 @@ const handleBeforeUnload = (event: BeforeUnloadEvent) => {
   event.preventDefault()
 }
 
+const handleWaitingRefresh = (event: PwaWaitingRefreshEvent) => {
+  waitingRefreshWorker.value = event.detail.worker
+  showWaitingRefreshConfirm.value = true
+}
+
+const handleWaitingRefreshConfirm = () => {
+  const worker = waitingRefreshWorker.value
+  waitingRefreshWorker.value = null
+
+  if (! worker) return
+
+  worker.postMessage({ type: 'SKIP_WAITING' })
+  window.location.reload()
+}
+
+const handleWaitingRefreshCancel = () => {
+  waitingRefreshWorker.value = null
+}
+
 onMounted(async () => {
   window.addEventListener('beforeunload', handleBeforeUnload)
+  window.addEventListener('rsbuild-plugin-pwa:waiting-refresh', handleWaitingRefresh)
   await loadTodos()
 
   // 如果没有数据，添加一些示例数据
@@ -228,6 +258,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
+  window.removeEventListener('rsbuild-plugin-pwa:waiting-refresh', handleWaitingRefresh)
 })
 
 watch(

@@ -84,6 +84,6 @@ const emit = defineEmits<{
 }
 
 .white-at-end {
-  height: 50vh;
+  height: 80vh;
 }
 </style>

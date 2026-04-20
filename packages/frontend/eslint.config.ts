@@ -26,6 +26,7 @@ export default [
     },
     rules: {
       semi: 'off',
+      quotes: ['error', 'single'],
       'no-trailing-spaces': 'error',
       'brace-style': ['error', 'stroustrup', { allowSingleLine: true }],
       'space-unary-ops': ['error', { words: true, nonwords: true }],
