@@ -26,6 +26,7 @@
     <div v-if="todos.length === 0" class="empty-state">
       暂无 Todo 项
     </div>
+    <div v-else class="white-at-end"></div>
   </div>
 </template>
 
@@ -80,5 +81,9 @@ const emit = defineEmits<{
   color: #9ca3af;
   padding: 40px;
   font-size: var(--text-lg);
+}
+
+.white-at-end {
+  height: 50vh;
 }
 </style>

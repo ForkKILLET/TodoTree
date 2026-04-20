@@ -63,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref, computed, provide, toRaw } from 'vue'
+import { onMounted, onBeforeUnmount, ref, computed, provide, toRaw, watch } from 'vue'
 import Toolbar from '@/components/Toolbar.vue'
 import TodoList from '@/components/TodoList.vue'
 import SettingsPanel from '@/components/SettingsPanel.vue'
@@ -93,7 +93,8 @@ const {
   importTodos,
   setViewMode,
   setFilterOptions,
-  setSortOptions
+  setSortOptions,
+  setPreserveVisibleTodoIds
 } = useTodos()
 
 const { settingsData } = useSettings()
@@ -117,24 +118,31 @@ const selectedTodo = computed(() => {
   return displayTodos.value.find(todo => todo.id === selectedTodoId.value) ?? null
 })
 const showDetailPanel = computed(() => !! selectedTodo.value && ! showSettings.value)
+const editingPreserveIds = computed(() => {
+  const ids = new Set<string>()
+  if (editingTodoId.value) ids.add(editingTodoId.value)
+  if (listEditingTodoId.value) ids.add(listEditingTodoId.value)
+  if (detailEditingTodoId.value) ids.add(detailEditingTodoId.value)
+  return [...ids]
+})
 const unsavedTodoCount = computed(() => {
   const todosMap = new Map(displayTodos.value.map(todo => [todo.id, todo.content]))
-  return Object.entries(editDrafts.value).reduce((count, [id, draft]) => {
-    const original = todosMap.get(id)
-    if (original === undefined) {
-      return draft.trim().length > 0 ? count + 1 : count
-    }
-    return draft !== original ? count + 1 : count
-  }, 0)
+  return Object
+    .entries(editDrafts.value)
+    .reduce((count, [id, draft]) => {
+      const original = todosMap.get(id)
+      const isUnsaved = original === undefined
+        ? draft.trim().length > 0
+        : draft !== original
+      return count + Number(isUnsaved)
+    }, 0)
 })
 
 const handleBeforeUnload = (event: BeforeUnloadEvent) => {
   if (settingsData.value.autoSubmitOnBlur ?? true) return
   if (unsavedTodoCount.value === 0) return
 
-  const message = `当前有 ${unsavedTodoCount.value} 个 Todo 项有未保存更改，确定要离开吗？`
   event.preventDefault()
-  event.returnValue = message
 }
 
 onMounted(async () => {
@@ -151,6 +159,12 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
 })
+
+watch(
+  editingPreserveIds,
+  setPreserveVisibleTodoIds,
+  { immediate: true }
+)
 
 const handleFilterUpdate = (options: FilterOptions) => {
   setFilterOptions(options)

@@ -82,6 +82,7 @@ export function useTodos() {
   const viewMode = ref<ViewMode>(initialViewMode)
   const filterOptions = ref<FilterOptions>(initialFilterOptions)
   const sortOptions = ref<SortOptions>(initialSortOptions)
+  const preserveVisibleTodoIds = ref<Set<string>>(new Set())
   const loading = ref(false)
   const expandedIds = ref<Set<string>>(new Set(initialExpandedIds))
   const now = useNow(60_000)
@@ -664,7 +665,11 @@ export function useTodos() {
   }
 
   // 树形筛选：保留匹配节点及其所有祖先，并标记匹配节点/未展开命中后代
-  const filterTreeNodes = (nodes: TodoTreeNode[], matchedIds: Set<string>): TodoTreeNode[] => {
+  const filterTreeNodes = (
+    nodes: TodoTreeNode[],
+    matchedIds: Set<string>,
+    preservedIds: Set<string>
+  ): TodoTreeNode[] => {
     const hasSearchText = Boolean(filterOptions.value.searchText?.trim())
 
     const walk = (node: TodoTreeNode): { kept: TodoTreeNode | null, hasMatchInSubtree: boolean, hasCollapsedMatchInSubtree: boolean } => {
@@ -673,12 +678,15 @@ export function useTodos() {
         .map(result => result.kept)
         .filter((child): child is TodoTreeNode => child !== null)
 
-      const isMatch = nodeMatchesFilter(node)
-      if (isMatch) {
+      const isFilterMatch = nodeMatchesFilter(node)
+      const isPreserved = preservedIds.has(node.id)
+      const isKeptMatch = isFilterMatch || isPreserved
+
+      if (isFilterMatch) {
         matchedIds.add(node.id)
       }
 
-      const hasMatchInSubtree = isMatch || childResults.some(result => result.hasMatchInSubtree)
+      const hasMatchInSubtree = isKeptMatch || childResults.some(result => result.hasMatchInSubtree)
       if (! hasMatchInSubtree) {
         return { kept: null, hasMatchInSubtree: false, hasCollapsedMatchInSubtree: false }
       }
@@ -692,7 +700,7 @@ export function useTodos() {
           ...node,
           children: keptChildren.map(c => c.id),
           childNodes: keptChildren,
-          isFilterMatch: hasSearchText && isMatch,
+          isFilterMatch: hasSearchText && isFilterMatch,
           hasCollapsedMatchedDescendant: hasCollapsedMatchInSubtree
         },
         hasMatchInSubtree,
@@ -725,8 +733,8 @@ export function useTodos() {
   }
 
   // 扁平列表过滤（仅用于扁平视图）
-  const applyFilter = (items: TodoTreeNode[]): TodoTreeNode[] => {
-    return items.filter(item => nodeMatchesFilter(item))
+  const applyFilter = (items: TodoTreeNode[], preservedIds: Set<string>): TodoTreeNode[] => {
+    return items.filter(item => preservedIds.has(item.id) || nodeMatchesFilter(item))
   }
 
   // 排序比较器（级联多步骤排序）
@@ -761,8 +769,7 @@ export function useTodos() {
 
   // 平铺列表排序（仅用于平铺视图）
   const applySort = (items: TodoTreeNode[]): TodoTreeNode[] => {
-    const sorted = [...items]
-    sorted.sort(compareBySortOptions)
+    const sorted = [...items].sort(compareBySortOptions)
     return sorted
   }
 
@@ -771,7 +778,7 @@ export function useTodos() {
     const sorted = [...nodes].sort(compareBySortOptions)
 
     return sorted.map(node => {
-      if (! node.childNodes || node.childNodes.length === 0) {
+      if (! node.childNodes?.length) {
         return node
       }
 
@@ -803,7 +810,7 @@ export function useTodos() {
 
       // 先筛选，再基于筛选结果重算 effectiveDueAt，最后排序
       const matchedIds = new Set<string>()
-      const filteredTree = filterTreeNodes(tree, matchedIds)
+      const filteredTree = filterTreeNodes(tree, matchedIds, preserveVisibleTodoIds.value)
       const filteredMap = buildFilteredMap(filteredTree)
       const assignEffectiveDueAt = (node: TodoTreeNode) => {
         node.childNodes?.forEach(assignEffectiveDueAt)
@@ -818,7 +825,7 @@ export function useTodos() {
     }
 
     nodes = getAllNodes(todos.value)
-    nodes = applyFilter(nodes)
+    nodes = applyFilter(nodes, preserveVisibleTodoIds.value)
     nodes = applySort(nodes)
 
     return nodes
@@ -873,7 +880,7 @@ export function useTodos() {
     const tree = buildTree(todos.value)
     const sortedTree = sortTreeNodes(tree)
     const matchedIds = new Set<string>()
-    const filteredTree = filterTreeNodes(sortedTree, matchedIds)
+    const filteredTree = filterTreeNodes(sortedTree, matchedIds, preserveVisibleTodoIds.value)
     const targetNode = findNodeInTree(filteredTree, id)
     if (! targetNode) return
 
@@ -911,6 +918,10 @@ export function useTodos() {
     writeStorage(STORAGE_KEYS.sortOptions, sortOptions.value)
   }
 
+  const setPreserveVisibleTodoIds = (ids: string[]) => {
+    preserveVisibleTodoIds.value = new Set(ids)
+  }
+
   return {
     todos,
     displayTodos,
@@ -931,6 +942,7 @@ export function useTodos() {
     importTodos,
     setViewMode,
     setFilterOptions,
-    setSortOptions
+    setSortOptions,
+    setPreserveVisibleTodoIds
   }
 }
