@@ -108,7 +108,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, ref, watch, onMounted, onBeforeUnmount, toRef } from 'vue'
+import { computed, inject, ref, watch, toRef } from 'vue'
+import { useEventListener } from '@vueuse/core'
 import { ChevronRight, ChevronDown, ChevronsRight, Pencil, Plus, Trash2, FileCode2, NotebookPen, Check, X, Timer } from 'lucide-vue-next'
 import type { Component } from 'vue'
 import TButton from '@/components/TButton.vue'
@@ -384,17 +385,9 @@ const handleDrop = (e: DragEvent) => {
   clearDragIndicator()
 }
 
-onMounted(() => {
-  window.addEventListener('dragend', clearDragIndicator)
-  window.addEventListener('drop', clearDragIndicator)
-  window.addEventListener(CLEAR_DRAG_INDICATORS_EVENT, handleGlobalClearIndicators)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('dragend', clearDragIndicator)
-  window.removeEventListener('drop', clearDragIndicator)
-  window.removeEventListener(CLEAR_DRAG_INDICATORS_EVENT, handleGlobalClearIndicators)
-})
+useEventListener(window, 'dragend', clearDragIndicator)
+useEventListener(window, 'drop', clearDragIndicator)
+useEventListener(window, CLEAR_DRAG_INDICATORS_EVENT, handleGlobalClearIndicators)
 
 const defaultActionButtons = computed<ActionButton[]>(() => [
   { key: 'edit', icon: Pencil, tooltip: '编辑', onClick: () => { void startListEdit() } },

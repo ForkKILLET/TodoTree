@@ -1,4 +1,5 @@
 import type { Directive } from 'vue'
+import { useEventListener } from '@vueuse/core'
 
 const TOOLTIP_DELAY = 600
 
@@ -63,15 +64,15 @@ export const vTooltip: Directive<HTMLElement, string> = {
       }
     }
 
-    el.addEventListener('mouseenter', showTooltip)
-    el.addEventListener('mouseleave', hideTooltip)
+    const stopMouseEnter = useEventListener(el, 'mouseenter', showTooltip)
+    const stopMouseLeave = useEventListener(el, 'mouseleave', hideTooltip)
     el._tooltipSetText = setText
     setText(binding.value)
 
     el._tooltipCleanup = () => {
       hideTooltip()
-      el.removeEventListener('mouseenter', showTooltip)
-      el.removeEventListener('mouseleave', hideTooltip)
+      stopMouseEnter()
+      stopMouseLeave()
       delete el._tooltipSetText
     }
   },

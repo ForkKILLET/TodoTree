@@ -12,6 +12,7 @@
     "check": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@vueuse/core": "^14.2.1",
     "dexie": "^4.3.0",
     "lucide-vue-next": "^0.577.0",
     "marked": "^17.0.4",

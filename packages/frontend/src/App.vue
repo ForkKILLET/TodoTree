@@ -83,7 +83,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref, computed, provide, toRaw, watch, nextTick } from 'vue'
+import { onMounted, ref, computed, provide, toRaw, watch, nextTick } from 'vue'
+import { useEventListener } from '@vueuse/core'
 import Toolbar from '@/components/Toolbar.vue'
 import TodoList from '@/components/TodoList.vue'
 import SettingsPanel from '@/components/SettingsPanel.vue'
@@ -244,9 +245,10 @@ const handleWaitingRefreshCancel = () => {
   waitingRefreshWorker.value = null
 }
 
+useEventListener(window, 'beforeunload', handleBeforeUnload)
+useEventListener(window, 'rsbuild-plugin-pwa:waiting-refresh', handleWaitingRefresh)
+
 onMounted(async () => {
-  window.addEventListener('beforeunload', handleBeforeUnload)
-  window.addEventListener('rsbuild-plugin-pwa:waiting-refresh', handleWaitingRefresh)
   await loadTodos()
 
   // 如果没有数据，添加一些示例数据
@@ -254,11 +256,6 @@ onMounted(async () => {
     await createTodo('欢迎使用 **TodoTree**\n\n这是一个树形 Todo 管理应用')
     await loadTodos()
   }
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('beforeunload', handleBeforeUnload)
-  window.removeEventListener('rsbuild-plugin-pwa:waiting-refresh', handleWaitingRefresh)
 })
 
 watch(

@@ -225,7 +225,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
+import { useEventListener } from '@vueuse/core'
 import { Plus, Funnel, ArrowUpDown, SortAsc, SortDesc, Trash2, Settings, CircleCheck, Lightbulb, MoreHorizontal, Download, Upload, Timer, CalendarCheck2, CalendarX2, CalendarClock, Eye, EyeOff } from 'lucide-vue-next'
 import type { Component } from 'vue'
 import { GitHubIcon } from 'vue3-simple-icons'
@@ -507,13 +508,7 @@ const handleOutsideClick = (event: MouseEvent) => {
   }
 }
 
-onMounted(() => {
-  document.addEventListener('click', handleOutsideClick)
-})
-
-onBeforeUnmount(() => {
-  document.removeEventListener('click', handleOutsideClick)
-})
+useEventListener(document, 'click', handleOutsideClick)
 </script>
 
 <style scoped>
