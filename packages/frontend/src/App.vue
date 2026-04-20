@@ -1,6 +1,7 @@
 <template>
   <div class="app">
     <Toolbar
+      ref="toolbar"
       :view-mode="viewMode"
       :filter-options="filterOptions"
       :sort-steps="sortOptions"
@@ -83,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed, provide, toRaw, watch, nextTick } from 'vue'
+import { onMounted, ref, computed, provide, toRaw, watch, nextTick, useTemplateRef } from 'vue'
 import { useEventListener } from '@vueuse/core'
 import Toolbar from '@/components/Toolbar.vue'
 import TodoList from '@/components/TodoList.vue'
@@ -176,28 +177,52 @@ const unsavedTodoCount = computed(() => {
     }, 0)
 })
 
-const TOP_LEVEL_TODO_SELECTOR = '.todo-item[data-todo-level="0"][data-todo-id]'
+const TODO_SELECTOR = '.todo-item'
 let filterScrollSyncToken = 0
 
 interface ViewportScrollAnchor {
   todoId: string
-  top: number
+  offsetFromVisibleTop: number
+}
+
+const toolbar = useTemplateRef('toolbar')
+
+const getViewportVisibleTop = () => {
+  const toolbarElement = toolbar.value?.$el as HTMLElement | undefined
+  if (! toolbarElement) return 0
+
+  const rect = toolbarElement.getBoundingClientRect()
+  if (rect.bottom <= 0) return 0
+
+  return Math.min(rect.bottom, window.innerHeight)
 }
 
 const captureTopVisibleRootTodoAnchor = (): ViewportScrollAnchor | null => {
-  const topLevelTodoElements = Array.from(document.querySelectorAll<HTMLElement>(TOP_LEVEL_TODO_SELECTOR))
-  if (topLevelTodoElements.length === 0) return null
+  const todoElements = Array.from(document.querySelectorAll<HTMLElement>(TODO_SELECTOR))
+  if (todoElements.length === 0) return null
 
+  const viewportVisibleTop = getViewportVisibleTop()
   const viewportHeight = window.innerHeight
-  const visibleTopLevelTodoElements = topLevelTodoElements.filter(element => {
+  const visibleTodoElements = todoElements.filter(element => {
     const rect = element.getBoundingClientRect()
-    return rect.top > 0 && rect.bottom < viewportHeight
+    return rect.top > viewportVisibleTop && rect.bottom < viewportHeight
   })
 
-  if (visibleTopLevelTodoElements.length === 0) return null
+  if (visibleTodoElements.length === 0) return null
 
-  const topVisibleElement = visibleTopLevelTodoElements.reduce((candidate, element) => {
-    return element.getBoundingClientRect().top < candidate.getBoundingClientRect().top ? element : candidate
+  const topVisibleElement = visibleTodoElements.reduce((candidate, element) => {
+    const candidateLevel = Number(candidate.dataset.todoLevel ?? '')
+    const elementLevel = Number(element.dataset.todoLevel ?? '')
+    const normalizedCandidateLevel = Number.isFinite(candidateLevel) ? candidateLevel : Number.POSITIVE_INFINITY
+    const normalizedElementLevel = Number.isFinite(elementLevel) ? elementLevel : Number.POSITIVE_INFINITY
+
+    if (normalizedElementLevel !== normalizedCandidateLevel) {
+      return normalizedElementLevel < normalizedCandidateLevel ? element : candidate
+    }
+
+    const candidateVisibleTop = Math.max(candidate.getBoundingClientRect().top, viewportVisibleTop)
+    const elementVisibleTop = Math.max(element.getBoundingClientRect().top, viewportVisibleTop)
+    return elementVisibleTop < candidateVisibleTop ? element : candidate
   })
 
   const todoId = topVisibleElement.dataset.todoId
@@ -205,19 +230,25 @@ const captureTopVisibleRootTodoAnchor = (): ViewportScrollAnchor | null => {
 
   return {
     todoId,
-    top: topVisibleElement.getBoundingClientRect().top
+    offsetFromVisibleTop: topVisibleElement.getBoundingClientRect().top - viewportVisibleTop
   }
 }
 
 const restoreRootTodoAnchorPosition = (anchor: ViewportScrollAnchor) => {
-  const target = document.querySelector<HTMLElement>(`${TOP_LEVEL_TODO_SELECTOR}[data-todo-id="${anchor.todoId}"]`)
-  if (! target) return
+  const target = document.querySelector<HTMLElement>(`${TODO_SELECTOR}[data-todo-id="${anchor.todoId}"]`)
+  if (! target) return null
 
-  const offset = target.getBoundingClientRect().top - anchor.top
-  if (Math.abs(offset) < 0.5) return
+  const viewportVisibleTop = getViewportVisibleTop()
+  const desiredTop = viewportVisibleTop + anchor.offsetFromVisibleTop
+  const offset = target.getBoundingClientRect().top - desiredTop
+  const absOffset = Math.abs(offset)
+  if (absOffset < 0.5) return absOffset
 
   window.scrollBy({ top: offset, behavior: 'auto' })
+  return absOffset
 }
+
+const waitForNextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
 
 const handleBeforeUnload = (event: BeforeUnloadEvent) => {
   if (settingsData.value.autoSubmitOnBlur ?? true) return
@@ -274,6 +305,11 @@ const handleFilterUpdate = async (options: FilterOptions) => {
   if (! anchor) return
   await nextTick()
 
+  if (token !== filterScrollSyncToken) return
+  restoreRootTodoAnchorPosition(anchor)
+
+  // 二次校正，覆盖筛选后 toolbar 高度/内容重排带来的迟到位移
+  await waitForNextFrame()
   if (token !== filterScrollSyncToken) return
   restoreRootTodoAnchorPosition(anchor)
 }
