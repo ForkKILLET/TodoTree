@@ -59,6 +59,17 @@
       cancel-text="取消"
       @confirm="doImport"
     />
+    <ConfirmDialog
+      v-model="showDuplicateTodoConfirm"
+      title="发现重复 Todo"
+      :message="duplicateTodoMessage"
+      confirm-text="确认"
+      cancel-text="取消"
+      tertiary-text="查看已有"
+      @confirm="handleDuplicateTodoConfirm"
+      @cancel="clearPendingDuplicateTodoUpdate"
+      @tertiary="handleDuplicateTodoJump"
+    />
   </div>
 </template>
 
@@ -75,6 +86,7 @@ import { settingsDataInjectionKey } from '@/constants/inject'
 import type { Todo, FilterOptions, SortOptions, TodoTreeNode } from '@/types/todo'
 
 const {
+  todos,
   displayTodos,
   viewMode,
   filterOptions,
@@ -111,6 +123,12 @@ const listForceExitKey = ref(0)
 const detailForceExitKey = ref(0)
 const showImportConfirm = ref(false)
 const pendingImportData = ref<Todo[] | null>(null)
+const showDuplicateTodoConfirm = ref(false)
+const pendingDuplicateTodoUpdate = ref<{
+  todoId: string
+  content: string
+  duplicateIds: string[]
+} | null>(null)
 
 const isDraggable = computed(() => sortOptions.value.length === 0 && viewMode.value === 'tree')
 const selectedTodo = computed(() => {
@@ -120,10 +138,18 @@ const selectedTodo = computed(() => {
 const showDetailPanel = computed(() => !! selectedTodo.value && ! showSettings.value)
 const editingPreserveIds = computed(() => {
   const ids = new Set<string>()
+  if (selectedTodoId.value) ids.add(selectedTodoId.value)
   if (editingTodoId.value) ids.add(editingTodoId.value)
   if (listEditingTodoId.value) ids.add(listEditingTodoId.value)
   if (detailEditingTodoId.value) ids.add(detailEditingTodoId.value)
   return [...ids]
+})
+const duplicateTodoMessage = computed(() => {
+  const pending = pendingDuplicateTodoUpdate.value
+  if (! pending) return '有重复的 Todo 项。'
+
+  const duplicateCount = pending.duplicateIds.length
+  return `有重复的 Todo 项（同级已存在 ${duplicateCount} 条相同内容）。是否继续保存？`
 })
 const unsavedTodoCount = computed(() => {
   const todosMap = new Map(displayTodos.value.map(todo => [todo.id, todo.content]))
@@ -187,11 +213,87 @@ const handleAddChild = async (parentId: string) => {
   editingTodoId.value = id
 }
 
+const getDuplicateSiblingIds = (todoId: string, content: string) => {
+  const normalized = content.trim()
+  if (! normalized) return []
+
+  const currentTodo = todos.value.find(todo => todo.id === todoId)
+  if (! currentTodo) return []
+
+  return todos.value
+    .filter(todo => {
+      if (todo.id === todoId) return false
+      if (todo.parentId !== currentTodo.parentId) return false
+      return todo.content.trim() === normalized
+    })
+    .sort((a, b) => a.order - b.order)
+    .map(todo => todo.id)
+}
+
+const expandToTodo = (todoId: string) => {
+  const todoMap = new Map(todos.value.map(todo => [todo.id, todo]))
+  let current = todoMap.get(todoId)
+
+  while (current?.parentId) {
+    if (! expandedIds.value.has(current.parentId)) {
+      toggleExpand(current.parentId)
+    }
+    current = todoMap.get(current.parentId)
+  }
+}
+
+const clearPendingDuplicateTodoUpdate = () => {
+  pendingDuplicateTodoUpdate.value = null
+}
+
 const handleUpdate = async (id: string, changes: Partial<TodoTreeNode>) => {
+  const nextContent = typeof changes.content === 'string' ? changes.content : null
+  if (nextContent !== null) {
+    const currentTodo = todos.value.find(todo => todo.id === id)
+    if (currentTodo && nextContent !== currentTodo.content) {
+      const duplicateIds = getDuplicateSiblingIds(id, nextContent)
+      if (duplicateIds.length > 0) {
+        pendingDuplicateTodoUpdate.value = { todoId: id, content: nextContent, duplicateIds }
+        showDuplicateTodoConfirm.value = true
+        return
+      }
+    }
+  }
+
   await updateTodo(id, changes)
   if (editingTodoId.value === id && Object.prototype.hasOwnProperty.call(changes, 'content')) {
     editingTodoId.value = null
   }
+}
+
+const handleDuplicateTodoConfirm = async () => {
+  const pending = pendingDuplicateTodoUpdate.value
+  if (! pending) return
+
+  await updateTodo(pending.todoId, { content: pending.content })
+  delete editDrafts.value[pending.todoId]
+
+  if (editingTodoId.value === pending.todoId) {
+    editingTodoId.value = null
+  }
+
+  clearPendingDuplicateTodoUpdate()
+}
+
+const handleDuplicateTodoJump = () => {
+  const pending = pendingDuplicateTodoUpdate.value
+  if (! pending) return
+
+  const existingTodoId = pending.duplicateIds[0]
+  if (! existingTodoId) {
+    clearPendingDuplicateTodoUpdate()
+    return
+  }
+
+  expandToTodo(existingTodoId)
+  selectedTodoId.value = existingTodoId
+  showSettings.value = false
+  clearPendingDuplicateTodoUpdate()
 }
 
 const handleOpenSettings = () => {
@@ -267,7 +369,9 @@ const handleEditChange = (todoId: string, content: string) => {
 }
 
 const handleEditEnd = (todoId: string, content: string, source: 'list' | 'detail', saved: boolean) => {
-  if (saved) {
+  const hasPendingDuplicateForTodo = pendingDuplicateTodoUpdate.value?.todoId === todoId
+
+  if (saved && ! hasPendingDuplicateForTodo) {
     delete editDrafts.value[todoId]
   }
   else {

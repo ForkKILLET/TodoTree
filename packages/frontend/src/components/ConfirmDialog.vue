@@ -10,11 +10,18 @@
             <p class="dialog-message">{{ message }}</p>
           </div>
           <div class="dialog-footer">
+            <TButton theme="primary" @click="handleConfirm">
+              {{ confirmText }}
+            </TButton>
             <TButton theme="normal" @click="handleCancel">
               {{ cancelText }}
             </TButton>
-            <TButton theme="primary" @click="handleConfirm">
-              {{ confirmText }}
+            <TButton
+              v-if="tertiaryText"
+              theme="normal"
+              @click="handleTertiary"
+            >
+              {{ tertiaryText }}
             </TButton>
           </div>
         </div>
@@ -32,19 +39,22 @@ interface Props {
   message?: string
   confirmText?: string
   cancelText?: string
+  tertiaryText?: string
 }
 
 withDefaults(defineProps<Props>(), {
   title: '确认',
   message: '确定要执行此操作吗？',
   confirmText: '确定',
-  cancelText: '取消'
+  cancelText: '取消',
+  tertiaryText: ''
 })
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
   (e: 'confirm'): void
   (e: 'cancel'): void
+  (e: 'tertiary'): void
 }>()
 
 const handleConfirm = () => {
@@ -54,6 +64,11 @@ const handleConfirm = () => {
 
 const handleCancel = () => {
   emit('cancel')
+  emit('update:modelValue', false)
+}
+
+const handleTertiary = () => {
+  emit('tertiary')
   emit('update:modelValue', false)
 }
 </script>
@@ -110,6 +125,7 @@ const handleCancel = () => {
   border-top: 1px solid var(--color-border);
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
